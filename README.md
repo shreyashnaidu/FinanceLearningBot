@@ -4,5 +4,5 @@ An AI-powered investment education assistant built with LangGraph and Streamlit.
 
 ## Team Members
 - Abhishek Harish Thumar
-- Aneesh Reddy Koppurapua
+- Shreyash Naidu Mamidi
 - Kyle Lobo
