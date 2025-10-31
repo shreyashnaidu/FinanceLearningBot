@@ -1,6 +1,6 @@
 import streamlit as st
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, List
+from typing import TypedDict, List, Dict
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -30,6 +30,8 @@ class GoalState(TypedDict):
     completed_tasks: List[str]
     user_info: dict
     messages: List[str]
+    portfolio: Dict[str, float]  # NEW: Portfolio allocation
+    portfolio_analysis: str  # NEW: Portfolio analysis result
 
 # LangGraph Node Functions
 def decompose_goal(state: GoalState) -> GoalState:
@@ -92,6 +94,59 @@ Example format:
     
     return state
 
+def analyze_portfolio(state: GoalState) -> GoalState:
+    """NEW: Analyze user's portfolio and provide guidance"""
+    portfolio = state.get("portfolio", {})
+    user_info = state.get("user_info", {})
+    
+    if not portfolio:
+        return state
+    
+    # Create portfolio description
+    portfolio_desc = ", ".join([f"{k}: {v}%" for k, v in portfolio.items()])
+    total = sum(portfolio.values())
+    
+    prompt = f"""You are a financial advisor analyzing a client's investment portfolio.
+
+Client Profile:
+- Experience Level: {user_info.get('experience', 'beginner')}
+- Portfolio: {portfolio_desc}
+- Total Allocation: {total}%
+
+Provide a comprehensive portfolio analysis including:
+
+1. **Portfolio Health Assessment**: Rate the portfolio (Excellent/Good/Needs Improvement/Poor)
+
+2. **Diversification Analysis**: Comment on the current asset allocation
+
+3. **Risk Assessment**: Identify any concentration risks or concerns
+
+4. **Specific Recommendations**: Provide 3-5 actionable recommendations to improve the portfolio
+
+5. **Explanation**: Explain WHY each recommendation matters for their financial health
+
+Be specific, educational, and actionable. Tailor advice to their experience level.
+Format your response in clear sections with headers.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=800
+        )
+        
+        analysis = response.choices[0].message.content
+        state["portfolio_analysis"] = analysis
+        state["messages"].append("Portfolio analysis complete")
+        
+    except Exception as e:
+        st.error(f"Error analyzing portfolio: {str(e)}")
+        state["messages"].append(f"Portfolio analysis error: {str(e)}")
+    
+    return state
+
 def display_tasks(state: GoalState) -> GoalState:
     """Mark tasks as ready for display"""
     state["messages"].append("Tasks ready for display")
@@ -103,10 +158,12 @@ def create_goal_mentor_graph():
     
     # Add nodes
     workflow.add_node("decompose", decompose_goal)
+    workflow.add_node("analyze_portfolio", analyze_portfolio)
     workflow.add_node("display", display_tasks)
     
     # Add edges
-    workflow.add_edge("decompose", "display")
+    workflow.add_edge("decompose", "analyze_portfolio")
+    workflow.add_edge("analyze_portfolio", "display")
     workflow.add_edge("display", END)
     
     # Set entry point
@@ -145,10 +202,113 @@ def main():
         )
         
         st.markdown("---")
+        
+        # NEW: Portfolio Input Section
+        st.header("📊 Portfolio Analysis")
+        st.markdown("*Get personalized portfolio guidance*")
+        
+        st.markdown("**Current Asset Allocation (%)**")
+        
+        stocks = st.number_input("Stocks", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="stocks")
+        bonds = st.number_input("Bonds", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="bonds")
+        cash = st.number_input("Cash/Savings", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="cash")
+        real_estate = st.number_input("Real Estate", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="real_estate")
+        crypto = st.number_input("Cryptocurrency", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="crypto")
+        other = st.number_input("Other", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="other")
+        
+        total_allocation = stocks + bonds + cash + real_estate + crypto + other
+        
+        # Display total with color coding
+        if total_allocation == 100:
+            st.success(f"✅ Total Allocation: {total_allocation}%")
+        elif total_allocation > 0:
+            st.warning(f"⚠️ Total Allocation: {total_allocation}% (Must be 100%)")
+        else:
+            st.info("💡 Total Allocation: 0% (Enter your portfolio)")
+        
+        # Analyze Portfolio Button - Only enabled when total is 100%
+        analyze_enabled = (total_allocation == 100.0)
+        
+        if st.button(
+            "🔍 Analyze Portfolio", 
+            type="primary",
+            disabled=not analyze_enabled,
+            help="Total allocation must equal 100% to analyze" if not analyze_enabled else "Click to analyze your portfolio",
+            use_container_width=True
+        ):
+            # Build portfolio dict
+            portfolio = {}
+            if stocks > 0: portfolio["Stocks"] = stocks
+            if bonds > 0: portfolio["Bonds"] = bonds
+            if cash > 0: portfolio["Cash"] = cash
+            if real_estate > 0: portfolio["Real Estate"] = real_estate
+            if crypto > 0: portfolio["Cryptocurrency"] = crypto
+            if other > 0: portfolio["Other"] = other
+            
+            with st.spinner("Analyzing your portfolio..."):
+                # Create state for portfolio analysis only
+                portfolio_state = {
+                    "goal": "",
+                    "subtasks": [],
+                    "completed_tasks": [],
+                    "user_info": {
+                        "experience": experience.lower(),
+                        "time": time_available
+                    },
+                    "messages": [],
+                    "portfolio": portfolio,
+                    "portfolio_analysis": ""
+                }
+                
+                # Run only portfolio analysis
+                analyzed_state = analyze_portfolio(portfolio_state)
+                
+                # Store in session state
+                if 'portfolio_analysis_only' not in st.session_state:
+                    st.session_state.portfolio_analysis_only = {}
+                
+                st.session_state.portfolio_analysis_only = {
+                    'portfolio': portfolio,
+                    'analysis': analyzed_state.get('portfolio_analysis', '')
+                }
+            
+            st.success("✅ Portfolio analysis complete!")
+            st.rerun()
+        
+        st.markdown("---")
         st.markdown("### About")
-        st.info("This AI mentor helps you break down financial learning goals into actionable steps.")
+        st.info("This AI mentor helps you break down financial learning goals into actionable steps and provides portfolio guidance.")
     
     # Main content area
+    
+    # Display Portfolio-Only Analysis (if exists)
+    if 'portfolio_analysis_only' in st.session_state and st.session_state.portfolio_analysis_only:
+        st.subheader("💼 Your Portfolio Analysis")
+        
+        portfolio_data = st.session_state.portfolio_analysis_only
+        
+        # Display portfolio allocation in columns
+        st.markdown("**Current Allocation:**")
+        portfolio = portfolio_data.get('portfolio', {})
+        if portfolio:
+            cols = st.columns(len(portfolio))
+            for idx, (asset, pct) in enumerate(portfolio.items()):
+                with cols[idx]:
+                    st.metric(asset, f"{pct}%")
+        
+        # Display analysis
+        st.markdown("---")
+        analysis = portfolio_data.get('analysis', '')
+        if analysis:
+            st.markdown(analysis)
+        
+        # Clear button
+        if st.button("🗑️ Clear Analysis"):
+            st.session_state.portfolio_analysis_only = None
+            st.rerun()
+        
+        st.markdown("---")
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
@@ -164,6 +324,15 @@ def main():
         if st.button("🚀 Generate Learning Path", type="primary"):
             if goal_input.strip():
                 with st.spinner("Creating your personalized learning path..."):
+                    # Build portfolio dict
+                    portfolio = {}
+                    if stocks > 0: portfolio["Stocks"] = stocks
+                    if bonds > 0: portfolio["Bonds"] = bonds
+                    if cash > 0: portfolio["Cash"] = cash
+                    if real_estate > 0: portfolio["Real Estate"] = real_estate
+                    if crypto > 0: portfolio["Cryptocurrency"] = crypto
+                    if other > 0: portfolio["Other"] = other
+                    
                     # Create initial state
                     initial_state = {
                         "goal": goal_input,
@@ -173,7 +342,9 @@ def main():
                             "experience": experience.lower(),
                             "time": time_available
                         },
-                        "messages": []
+                        "messages": [],
+                        "portfolio": portfolio,
+                        "portfolio_analysis": ""
                     }
                     
                     # Run the graph
@@ -198,6 +369,24 @@ def main():
         else:
             st.info("Enter a goal to see your progress!")
     
+    # NEW: Display Portfolio Analysis
+    if st.session_state.goal_state and st.session_state.goal_state.get('portfolio_analysis'):
+        st.markdown("---")
+        st.subheader("💼 Your Portfolio Analysis")
+        
+        # Display portfolio allocation
+        portfolio = st.session_state.goal_state.get('portfolio', {})
+        if portfolio:
+            st.markdown("**Current Allocation:**")
+            cols = st.columns(len(portfolio))
+            for idx, (asset, pct) in enumerate(portfolio.items()):
+                with cols[idx]:
+                    st.metric(asset, f"{pct}%")
+        
+        # Display analysis
+        st.markdown("---")
+        st.markdown(st.session_state.goal_state['portfolio_analysis'])
+    
     # Display subtasks
     if st.session_state.goal_state and st.session_state.goal_state.get('subtasks'):
         st.markdown("---")
@@ -221,7 +410,7 @@ def main():
                         st.session_state.goal_state['subtasks'][idx]['completed'] = True
                         st.rerun()
         
-        # Reset button
+        # Action buttons
         st.markdown("---")
         col_reset, col_export = st.columns(2)
         
@@ -234,6 +423,20 @@ def main():
             if st.button("📥 Export Learning Path"):
                 # Create text export
                 export_text = f"Finance Learning Goal: {st.session_state.goal_state['goal']}\n\n"
+                
+                # Add portfolio if exists
+                if st.session_state.goal_state.get('portfolio'):
+                    export_text += "Portfolio Allocation:\n"
+                    for asset, pct in st.session_state.goal_state['portfolio'].items():
+                        export_text += f"  {asset}: {pct}%\n"
+                    export_text += "\n"
+                
+                # Add analysis if exists
+                if st.session_state.goal_state.get('portfolio_analysis'):
+                    export_text += "Portfolio Analysis:\n"
+                    export_text += st.session_state.goal_state['portfolio_analysis']
+                    export_text += "\n\n"
+                
                 export_text += "Learning Path:\n"
                 for idx, task in enumerate(st.session_state.goal_state['subtasks']):
                     status = "✅" if task['completed'] else "⬜"

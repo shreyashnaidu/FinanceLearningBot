@@ -3,3 +3,6 @@ project_fastcar777
 project_fastcar777.zip
 .venv
 .env
+.pytest_cache
+tests/__pycache__
+tests/__init__.py
