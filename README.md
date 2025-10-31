@@ -94,3 +94,45 @@ pytest tests/test_user_story_2.py -v
 pytest tests/test_user_story_2.py -v
 ```
 
+### User Story 3: Progress Tracking & Learning Flow
+**Issue:** [#2](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/3)
+
+**Implementation:**
+- Real-time learning progress tracking
+- Task completion checkmarks + strike-through for finished tasks
+- Automatically highlights next recommended task
+- Phase-based unlocking (Phase 2 only visible once Phase 1 completed)
+- Session state preserves task progress
+- Added “Ask Mentor” glossary-based learning support (stores explained terms)
+
+
+**Changes Made:**
+1. Updated GoalState to store task completion status
+2. Added progress metrics and completion bar in UI
+3. Added task button logic to mark as complete and auto-advance
+4. Added glossary sidebar to store terms + explanations
+5. Integrated “Ask Mentor” section to explain finance terms in-app
+
+**Test Results:**
+```bash
+python -m unittest tests/test_user_story_3.py -v
+```
+- ✅ Scenario 1: Progress bar increases correctly as tasks are completed (33% at 5/15 tasks)
+- ✅ Scenario 2: Completing a task activates the next task in sequence
+- ✅ Scenario 3: Phase 2 tasks remain locked until all Phase 1 tasks are completed
+- ✅ Scenario 3: Phase 2 tasks remain locked until all Phase 1 tasks are completed
+
+**UI Features:**
+- Strike-through with ✅ indicator for completed tasks
+- Automatic “next task” activation to guide learning flow
+- Sequential phase unlocking to maintain structured learning
+- Glossary panel to review previously explained financial terms
+- “Explain This” assistant input for real-time concept clarification
+
+
+## Running Tests
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+
+```
