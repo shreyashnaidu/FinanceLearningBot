@@ -1,192 +1,250 @@
-import os
-import pandas as pd
 import streamlit as st
+from langgraph.graph import StateGraph, END
+from typing import TypedDict, List
+import os
 from dotenv import load_dotenv
+from openai import OpenAI
 
-# LangChain / LangGraph
-from langchain_openai import ChatOpenAI
-from langchain_core.tools import tool
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, AnyMessage
-from langgraph.graph import StateGraph, MessagesState, START, END
-from langgraph.prebuilt.tool_node import ToolNode
-# env config
+# Load environment variables
 load_dotenv()
-st.set_page_config(page_title="Hotel QA Agent", page_icon="🏨", layout="centered")
 
-@st.cache_data(show_spinner=False)
-def load_hotel_data(csv_path: str):
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(
-            f"Could not find dataset at '{csv_path}'. Place hotels.csv here or set HOTELS_CSV."
-        )
-    df = pd.read_csv(csv_path)
+# Get API key
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-    required = [
-        "hotel_id", "hotel_name", "city", "country",
-        "lat", "lon", "star_rating",
-        "cleanliness_base", "comfort_base", "facilities_base",
-    ]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns in CSV: {missing}")
-
-    df["city"] = df["city"].astype(str).str.strip().str.lower()
-    df["country"] = df["country"].astype(str).str.strip().str.lower()
-
-    num_cols = ["star_rating", "cleanliness_base", "comfort_base", "facilities_base"]
-    for c in num_cols:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df[num_cols] = df[num_cols].fillna(0)
-
-    df["hotel_name"] = df["hotel_name"].astype(str).str.strip()
-    return df
-
-HOTELS_CSV = os.getenv("HOTELS_CSV", "hotels.csv")
-hotels_df = load_hotel_data(HOTELS_CSV)
-
-def dataframe_to_markdown(df: pd.DataFrame) -> str:
-    """Return a simple GitHub-style markdown table for a DataFrame (no tabulate)."""
-    if df.empty:
-        return ""
-    headers = list(df.columns)
-    # Header row
-    lines = ["|" + "|".join(headers) + "|"]
-    # Separator row
-    lines.append("|" + "|".join(["---"] * len(headers)) + "|")
-    # Data rows
-    for _, row in df.iterrows():
-        cells = []
-        for col in headers:
-            val = row[col]
-            if isinstance(val, float):
-                cells.append(f"{val:.1f}")
-            else:
-                cells.append(str(val))
-        lines.append("|" + "|".join(cells) + "|")
-    return "\n".join(lines)
-
-@tool
-def query_hotels(
-    city: str = None,
-    country: str = None,
-    min_star: float = None,
-    min_cleanliness: float = None,
-    min_comfort: float = None,
-    min_facilities: float = None,
-    sort_by: str = None,
-    limit: int = 5
-) -> str:
-    """
-    Search the hotel dataset by filters and return a markdown table.
-    """
-    df = hotels_df.copy()
-
-    if city:
-        city = str(city).strip().lower()
-        df = df[df["city"].str.contains(city, na=False)]
-    if country:
-        country = str(country).strip().lower()
-        df = df[df["country"].str.contains(country, na=False)]
-    if min_star is not None:
-        df = df[df["star_rating"] >= float(min_star)]
-    if min_cleanliness is not None:
-        df = df[df["cleanliness_base"] >= float(min_cleanliness)]
-    if min_comfort is not None:
-        df = df[df["comfort_base"] >= float(min_comfort)]
-    if min_facilities is not None:
-        df = df[df["facilities_base"] >= float(min_facilities)]
-
-    if df.empty:
-        return (
-            "No hotels matched these filters. "
-            "Try broadening your search (e.g., lower minimums or check spelling for city/country)."
-        )
-
-    try:
-        limit = int(limit) if limit is not None else 5
-    except Exception:
-        limit = 5
-    limit = max(1, min(limit, 10))
-
-    valid_sort = ["star_rating", "cleanliness_base", "comfort_base", "facilities_base"]
-    if sort_by in valid_sort:
-        df = df.sort_values(by=sort_by, ascending=False)
-
-    cols = [
-        "hotel_name", "city", "country",
-        "star_rating", "cleanliness_base", "comfort_base", "facilities_base"
-    ]
-    df = df[cols].head(limit).copy()
-    df.columns = ["Hotel Name", "City", "Country", "Star Rating", "Cleanliness", "Comfort", "Facilities"]
-
-    return dataframe_to_markdown(df)
-
-SYSTEM_PROMPT = (
-    "You are a helpful travel assistant. "
-    "When the user asks about hotels or data from the hotel catalog, "
-    "use the `query_hotels` tool to retrieve results.\n\n"
-    "Instructions:\n"
-    "1) If a user asks for hotels by city/country or by rating thresholds, call the tool with appropriate arguments.\n"
-    "2) In your final answer, include a brief helpful sentence and the returned table.\n"
-)
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Validate API key
 if not OPENAI_API_KEY:
-    st.error("Missing OPENAI_API_KEY. Set it in your environment or .env file before running.")
+    st.error("⚠️ OpenAI API key not found! Please set your OPENAI_API_KEY in the .env file")
+    st.stop()
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=OPENAI_API_KEY)
-llm_with_tools = llm.bind_tools([query_hotels])
+# Initialize OpenAI client
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+except Exception as e:
+    st.error(f"❌ Error initializing OpenAI: {str(e)}")
+    st.stop()
 
-def llm_node(state: MessagesState) -> MessagesState:
-    """Call the LLM (bound with tools); may return tool calls or final text."""
-    messages: list[AnyMessage] = state["messages"]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
+# Define State for LangGraph
+class GoalState(TypedDict):
+    goal: str
+    subtasks: List[dict]
+    completed_tasks: List[str]
+    user_info: dict
+    messages: List[str]
 
-def route_after_llm(state: MessagesState):
-    """If the LLM asked for a tool, go to tool node; else end."""
-    last = state["messages"][-1]
-    if getattr(last, "tool_calls", None):
-        return "tools"
-    return END
+# LangGraph Node Functions
+def decompose_goal(state: GoalState) -> GoalState:
+    """Decompose user goal into subtasks using OpenAI"""
+    goal = state["goal"]
+    user_info = state.get("user_info", {})
+    
+    prompt = f"""You are a financial education mentor. Break down this financial learning goal into 5-7 concrete, actionable subtasks.
 
-graph = StateGraph(MessagesState)
-graph.add_node("agent", llm_node)
-graph.add_node("tools", ToolNode([query_hotels]))
-graph.add_edge(START, "agent")
-graph.add_conditional_edges("agent", route_after_llm, ["tools", END])
-graph.add_edge("tools", "agent")
-agent = graph.compile()
+Goal: {goal}
 
-st.title("🏨 Hotel QA Agent")
-st.caption("Ask me for hotels by city/country and rating thresholds. I’ll query the dataset and show results.")
+User Experience Level: {user_info.get('experience', 'beginner')}
+Available Time per Week: {user_info.get('time', 'not specified')}
 
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
+Create subtasks that are:
+- Specific and measurable
+- Ordered from beginner to advanced
+- Realistic and achievable
+- Focused on financial literacy
 
-# Render previous messages (skip system)
-for msg in st.session_state.messages:
-    if isinstance(msg, SystemMessage):
-        continue
-    role = "user" if isinstance(msg, HumanMessage) else "assistant"
-    with st.chat_message(role):
-        if role == "assistant":
-            st.markdown(msg.content)
+Return ONLY a numbered list of subtasks, nothing else.
+Example format:
+1. Learn the basics of personal budgeting
+2. Understand different types of bank accounts
+3. Research investment options
+...
+"""
+    
+    try:
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        response_text = response.choices[0].message.content
+        
+        # Parse the response into structured subtasks
+        subtasks_text = response_text.strip().split('\n')
+        subtasks = []
+        for idx, task in enumerate(subtasks_text):
+            if task.strip() and any(char.isdigit() for char in task[:3]):
+                # Remove numbering and clean up
+                task_text = task.split('.', 1)[-1].strip()
+                if task_text:
+                    subtasks.append({
+                        'id': idx,
+                        'task': task_text,
+                        'completed': False
+                    })
+        
+        state["subtasks"] = subtasks
+        state["messages"].append(f"Generated {len(subtasks)} subtasks")
+        
+    except Exception as e:
+        st.error(f"Error generating subtasks: {str(e)}")
+        state["messages"].append(f"Error: {str(e)}")
+    
+    return state
+
+def display_tasks(state: GoalState) -> GoalState:
+    """Mark tasks as ready for display"""
+    state["messages"].append("Tasks ready for display")
+    return state
+
+# Build LangGraph
+def create_goal_mentor_graph():
+    workflow = StateGraph(GoalState)
+    
+    # Add nodes
+    workflow.add_node("decompose", decompose_goal)
+    workflow.add_node("display", display_tasks)
+    
+    # Add edges
+    workflow.add_edge("decompose", "display")
+    workflow.add_edge("display", END)
+    
+    # Set entry point
+    workflow.set_entry_point("decompose")
+    
+    return workflow.compile()
+
+# Initialize the graph
+graph = create_goal_mentor_graph()
+
+# Streamlit UI
+def main():
+    st.set_page_config(
+        page_title="Finance Learning Bot - AI Goal Mentor",
+        page_icon="💰",
+        layout="wide"
+    )
+    
+    st.title("💰 Finance Learning Bot - AI Goal Mentor")
+    st.markdown("### Your Personal Financial Education Assistant")
+    
+    # Initialize session state
+    if 'goal_state' not in st.session_state:
+        st.session_state.goal_state = None
+    
+    # Sidebar for user information
+    with st.sidebar:
+        st.header("📋 Your Profile")
+        experience = st.selectbox(
+            "Financial Knowledge Level",
+            ["Beginner", "Intermediate", "Advanced"]
+        )
+        time_available = st.selectbox(
+            "Time Available per Week",
+            ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"]
+        )
+        
+        st.markdown("---")
+        st.markdown("### About")
+        st.info("This AI mentor helps you break down financial learning goals into actionable steps.")
+    
+    # Main content area
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("🎯 Enter Your Financial Learning Goal")
+        
+        # Goal input
+        goal_input = st.text_area(
+            "What would you like to learn about finance?",
+            placeholder="Example: Learn about stock market investing, Understand retirement planning, Master personal budgeting...",
+            height=100
+        )
+        
+        if st.button("🚀 Generate Learning Path", type="primary"):
+            if goal_input.strip():
+                with st.spinner("Creating your personalized learning path..."):
+                    # Create initial state
+                    initial_state = {
+                        "goal": goal_input,
+                        "subtasks": [],
+                        "completed_tasks": [],
+                        "user_info": {
+                            "experience": experience.lower(),
+                            "time": time_available
+                        },
+                        "messages": []
+                    }
+                    
+                    # Run the graph
+                    result = graph.invoke(initial_state)
+                    st.session_state.goal_state = result
+                    
+                st.success("✅ Learning path created successfully!")
+            else:
+                st.warning("Please enter a goal first!")
+    
+    with col2:
+        st.subheader("📊 Progress Overview")
+        if st.session_state.goal_state and st.session_state.goal_state.get('subtasks'):
+            total_tasks = len(st.session_state.goal_state['subtasks'])
+            completed = sum(1 for task in st.session_state.goal_state['subtasks'] if task['completed'])
+            progress = (completed / total_tasks * 100) if total_tasks > 0 else 0
+            
+            st.metric("Total Tasks", total_tasks)
+            st.metric("Completed", completed)
+            st.progress(progress / 100)
+            st.caption(f"{progress:.0f}% Complete")
         else:
-            st.write(msg.content)
+            st.info("Enter a goal to see your progress!")
+    
+    # Display subtasks
+    if st.session_state.goal_state and st.session_state.goal_state.get('subtasks'):
+        st.markdown("---")
+        st.subheader("📚 Your Learning Path")
+        st.markdown(f"**Goal:** {st.session_state.goal_state['goal']}")
+        
+        st.markdown("### Tasks")
+        
+        for idx, task in enumerate(st.session_state.goal_state['subtasks']):
+            col_task, col_button = st.columns([4, 1])
+            
+            with col_task:
+                if task['completed']:
+                    st.markdown(f"~~{idx + 1}. {task['task']}~~ ✅")
+                else:
+                    st.markdown(f"{idx + 1}. **{task['task']}**")
+            
+            with col_button:
+                if not task['completed']:
+                    if st.button("✓ Complete", key=f"complete_{idx}"):
+                        st.session_state.goal_state['subtasks'][idx]['completed'] = True
+                        st.rerun()
+        
+        # Reset button
+        st.markdown("---")
+        col_reset, col_export = st.columns(2)
+        
+        with col_reset:
+            if st.button("🔄 Start New Goal"):
+                st.session_state.goal_state = None
+                st.rerun()
+        
+        with col_export:
+            if st.button("📥 Export Learning Path"):
+                # Create text export
+                export_text = f"Finance Learning Goal: {st.session_state.goal_state['goal']}\n\n"
+                export_text += "Learning Path:\n"
+                for idx, task in enumerate(st.session_state.goal_state['subtasks']):
+                    status = "✅" if task['completed'] else "⬜"
+                    export_text += f"{idx + 1}. {status} {task['task']}\n"
+                
+                st.download_button(
+                    label="Download as Text",
+                    data=export_text,
+                    file_name="learning_path.txt",
+                    mime="text/plain"
+                )
 
-# Chat input
-user_text = st.chat_input("e.g., Top 5 hotels in Paris by cleanliness")
-if user_text:
-    with st.chat_message("user"):
-        st.write(user_text)
-    st.session_state.messages.append(HumanMessage(content=user_text))
-
-    state = {"messages": st.session_state.messages}
-    final = agent.invoke(state)
-
-    last = final["messages"][-1]
-    st.session_state.messages.append(last)
-    with st.chat_message("assistant"):
-        st.markdown(last.content)
+if __name__ == "__main__":
+    main()
