@@ -39,9 +39,16 @@ def decompose_goal(state: GoalState) -> GoalState:
     goal = state["goal"]
     user_info = state.get("user_info", {})
     
-    prompt = f"""You are a financial education mentor. Break down this financial learning goal into 5-7 concrete, actionable subtasks.
+    prompt = f"""You are a financial education mentor. Break down this financial learning goal into 4-5 concrete, actionable subtasks.
 
 Goal: {goal}
+
+User Financial Situation:
+- Age: {user_info.get('age', 'not specified')}
+- Risk Tolerance: {user_info.get('risk_tolerance', 'not specified')}
+- Current Savings: ${user_info.get('savings', 0):,}
+- Has 401(k): {user_info.get('has_401k', False)} (Balance: ${user_info.get('retirement_balance', 0):,})
+- Owns Stocks: {user_info.get('has_stocks', False)} (Value: ${user_info.get('stock_value', 0):,})
 
 User Experience Level: {user_info.get('experience', 'beginner')}
 Available Time per Week: {user_info.get('time', 'not specified')}
@@ -51,6 +58,7 @@ Create subtasks that are:
 - Ordered from beginner to advanced
 - Realistic and achievable
 - Focused on financial literacy
+- Tailored to their financial situation
 
 Return ONLY a numbered list of subtasks, nothing else.
 Example format:
@@ -192,6 +200,25 @@ def main():
     # Sidebar for user information
     with st.sidebar:
         st.header("📋 Your Profile")
+        
+        # Financial Situation inputs (User Story 1)
+        age = st.number_input("Age", min_value=18, max_value=100, value=25)
+        risk_tolerance = st.selectbox(
+            "Risk Tolerance",
+            ["Conservative", "Moderate", "Aggressive"],
+            index=1
+        )
+        savings = st.number_input("Current Savings ($)", min_value=0, value=10000, step=1000)
+        has_401k = st.checkbox("I have a 401(k)", value=False)
+        retirement_balance = 0
+        if has_401k:
+            retirement_balance = st.number_input("401(k) Balance ($)", min_value=0, value=0, step=1000)
+        has_stocks = st.checkbox("I own stocks", value=False)
+        stock_value = 0
+        if has_stocks:
+            stock_value = st.number_input("Stock Portfolio Value ($)", min_value=0, value=0, step=1000)
+        
+        st.markdown("---")
         experience = st.selectbox(
             "Financial Knowledge Level",
             ["Beginner", "Intermediate", "Advanced"]
@@ -339,6 +366,13 @@ def main():
                         "subtasks": [],
                         "completed_tasks": [],
                         "user_info": {
+                            "age": age,
+                            "risk_tolerance": risk_tolerance,
+                            "savings": savings,
+                            "has_401k": has_401k,
+                            "retirement_balance": retirement_balance,
+                            "has_stocks": has_stocks,
+                            "stock_value": stock_value,
                             "experience": experience.lower(),
                             "time": time_available
                         },
