@@ -95,7 +95,7 @@ pytest tests/test_user_story_2.py -v
 ```
 
 ### User Story 3: Progress Tracking & Learning Flow
-**Issue:** [#2](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/3)
+**Issue:** [#3](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/3)
 
 **Implementation:**
 - Real-time learning progress tracking
