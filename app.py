@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from typing import TypedDict, List, Dict
 from html import escape
 
@@ -16,7 +17,10 @@ def init_session_state():
     ss.setdefault("explanation", "")
     ss.setdefault("glossary", [])
     ss.setdefault("portfolio_analysis_only", None)
-    ss.setdefault("investment_recommendations", None) 
+    ss.setdefault("investment_recommendations", None)
+    ss.setdefault("suggested_allocation", None)  # NEW: User Story 5
+    ss.setdefault("portfolio_comparison", None)  # NEW: User Story 5
+    ss.setdefault("allocation_history", [])      # NEW: User Story 5
 
 def render_explanation_card(text: str, term: str | None = None):
     safe = escape(text).replace("\n", "<br>")
@@ -126,6 +130,148 @@ Keep response under 200 words. Be educational and encouraging.
     except Exception as e:
         return f"Error getting recommendations: {str(e)}"
 
+# ============= NEW: User Story 5 Functions =============
+
+def suggest_portfolio_allocation(risk_tolerance: str, current_allocation: dict = None) -> dict:
+    """Generate portfolio allocation based on risk tolerance"""
+    
+    prompt = f"""You are a financial advisor. Suggest a portfolio allocation for a {risk_tolerance} risk tolerance investor.
+
+Current allocation: {json.dumps(current_allocation) if current_allocation else "None - new portfolio"}
+
+Provide allocation recommendations as percentages that sum to 100%.
+
+For {risk_tolerance}:
+- Conservative: Higher bonds (60-70%), moderate stocks (20-30%), some cash (10%)
+- Moderate: Balanced (40-50% stocks, 30-40% bonds, 10-20% alternatives/cash)
+- Aggressive: Higher stocks (60-80%), some bonds (10-20%), alternatives (10-20%)
+
+Return ONLY a JSON object with allocation percentages. Example:
+{{"Stocks": 50, "Bonds": 40, "Alternatives": 10}}
+
+Do not include any markdown formatting, just the JSON.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=200
+        )
+        
+        content = response.choices[0].message.content.strip()
+        # Remove markdown code blocks if present
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        
+        allocation = json.loads(content.strip())
+        return allocation
+    except Exception as e:
+        # Fallback allocations
+        defaults = {
+            "Conservative": {"Bonds": 70, "Stocks": 20, "Cash": 10},
+            "Moderate": {"Stocks": 50, "Bonds": 40, "Alternatives": 10},
+            "Aggressive": {"Stocks": 70, "Bonds": 20, "Alternatives": 10}
+        }
+        return defaults.get(risk_tolerance, defaults["Moderate"])
+
+
+def explain_allocation_change(old_allocation: dict, new_allocation: dict, old_risk: str, new_risk: str) -> str:
+    """Explain differences between two allocations"""
+    
+    prompt = f"""Explain the change from {old_risk} to {new_risk} risk tolerance.
+
+Old allocation ({old_risk}): {json.dumps(old_allocation)}
+New allocation ({new_risk}): {json.dumps(new_allocation)}
+
+Explain in 2-3 sentences:
+1. What changed and why
+2. How this affects risk/return profile
+3. Key trade-offs
+
+Keep under 150 words.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=250
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Unable to generate explanation: {str(e)}"
+
+
+def adjust_allocation_by_feedback(current_allocation: dict, user_feedback: str) -> tuple:
+    """Adjust portfolio based on user feedback"""
+    
+    prompt = f"""User has this portfolio: {json.dumps(current_allocation)}
+
+User feedback: "{user_feedback}"
+
+Adjust the allocation based on their feedback while maintaining total of 100%.
+Explain the trade-offs (higher returns potential vs increased volatility/risk).
+
+Return a JSON object with this structure:
+{{
+  "allocation": {{"Stocks": X, "Bonds": Y, ...}},
+  "explanation": "Brief explanation of changes and trade-offs"
+}}
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=350
+        )
+        
+        content = response.choices[0].message.content.strip()
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        
+        result = json.loads(content.strip())
+        return result.get("allocation", current_allocation), result.get("explanation", "")
+    except Exception as e:
+        return current_allocation, f"Could not process feedback: {str(e)}"
+
+
+def compare_portfolios(portfolio1: dict, portfolio2: dict, label1: str, label2: str) -> str:
+    """Compare two portfolio allocations"""
+    
+    prompt = f"""Compare these two portfolios:
+
+Portfolio 1 ({label1}): {json.dumps(portfolio1)}
+Portfolio 2 ({label2}): {json.dumps(portfolio2)}
+
+Provide:
+1. Key differences in allocation
+2. Risk level comparison
+3. Expected return potential comparison
+4. Which might be suitable for different investor types
+
+Keep under 200 words.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=400
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Unable to compare portfolios: {str(e)}"
+
 # ============= LangGraph Types & Nodes =============
 
 class GoalState(TypedDict):
@@ -134,8 +280,8 @@ class GoalState(TypedDict):
     completed_tasks: List[str]
     user_info: dict
     messages: List[str]
-    portfolio: Dict[str, float]        # NEW: Portfolio allocation
-    portfolio_analysis: str            # NEW: Portfolio analysis result
+    portfolio: Dict[str, float]
+    portfolio_analysis: str
 
 def decompose_goal(state: GoalState) -> GoalState:
     """Decompose user goal into subtasks using OpenAI"""
@@ -185,7 +331,6 @@ Example format:
         )
         response_text = response.choices[0].message.content
 
-        # Parse lines "1. Task" / "1) Task" safely
         lines = [ln for ln in response_text.strip().splitlines() if ln.strip()]
         subtasks = []
         for idx, ln in enumerate(lines, start=1):
@@ -277,7 +422,6 @@ def main():
     with st.sidebar:
         st.header("📋 Your Profile")
 
-        # Financial Situation inputs
         experience = st.selectbox("Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"])
         time_available = st.selectbox("Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"])
         age = st.number_input("Age", min_value=18, max_value=100, value=25)
@@ -288,7 +432,7 @@ def main():
         stock_value = st.number_input("Stock Portfolio Value ($)", min_value=0, value=0, step=1000) if has_stocks else 0
 
         risk_tolerance = st.selectbox("Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1)
-        # Visual indicator for risk tolerance
+        
         risk_colors = {
             "Conservative": "🟢",
             "Moderate": "🟡",
@@ -317,7 +461,6 @@ def main():
             with st.spinner("Generating recommendations..."):
                 recommendations = get_investment_recommendations(risk_tolerance, "")
                 
-                # Store in session state
                 st.session_state['investment_recommendations'] = {
                     'risk_tolerance': risk_tolerance,
                     'recommendations': recommendations
@@ -325,6 +468,62 @@ def main():
             
             st.success("✅ Recommendations generated!")
             st.rerun()
+
+        st.markdown("---")
+        
+        # NEW: Portfolio Allocation Suggestions (User Story 5)
+        st.header("📈 Portfolio Allocation")
+        
+        if st.button(
+            "🎯 Suggest Allocation",
+            type="secondary",
+            use_container_width=True,
+            help=f"Get {risk_tolerance} portfolio allocation suggestion"
+        ):
+            with st.spinner(f"Generating {risk_tolerance} allocation..."):
+                allocation = suggest_portfolio_allocation(risk_tolerance)
+                
+                st.session_state['suggested_allocation'] = {
+                    'risk_tolerance': risk_tolerance,
+                    'allocation': allocation,
+                    'timestamp': 'current'
+                }
+                
+                st.session_state.allocation_history.append({
+                    'label': f"{risk_tolerance} Allocation",
+                    'allocation': allocation
+                })
+            
+            st.success("✅ Allocation generated!")
+            st.rerun()
+        
+        # NEW: User feedback for adjustment (User Story 5)
+        if st.session_state.get('suggested_allocation'):
+            st.markdown("**Adjust Allocation:**")
+            user_adjustment = st.text_input(
+                "Feedback",
+                placeholder="e.g., 'I want more stocks' or 'Less bonds'",
+                key="user_adjustment_input"
+            )
+            
+            if st.button("🔧 Adjust", use_container_width=True):
+                if user_adjustment.strip():
+                    current_alloc = st.session_state.suggested_allocation['allocation']
+                    
+                    with st.spinner("Adjusting allocation..."):
+                        new_alloc, explanation = adjust_allocation_by_feedback(
+                            current_alloc, user_adjustment
+                        )
+                        
+                        st.session_state.suggested_allocation = {
+                            'risk_tolerance': risk_tolerance,
+                            'allocation': new_alloc,
+                            'adjustment_explanation': explanation,
+                            'timestamp': 'adjusted'
+                        }
+                    
+                    st.success("✅ Adjusted!")
+                    st.rerun()
 
         st.markdown("---")
         st.header("📊 Portfolio Analysis")
@@ -386,7 +585,6 @@ def main():
         st.markdown("### About")
         st.info("This AI mentor breaks down learning goals and provides portfolio guidance.")
 
-        # Glossary panel
         if st.session_state.glossary:
             st.markdown("---")
             st.subheader("📘 My Glossary")
@@ -409,22 +607,107 @@ def main():
                     mime="text/plain"
                 )
 
-    # Display Investment Recommendations (if exists)
+    # -------- Main Content --------
+
+    # Display Investment Recommendations
     if 'investment_recommendations' in st.session_state and st.session_state.investment_recommendations:
         rec_data = st.session_state.investment_recommendations
         
         st.subheader(f"💡 Investment Recommendations ({rec_data['risk_tolerance']} Risk)")
-        
         st.markdown(rec_data['recommendations'])
         
-        # Clear button
         if st.button("🗑️ Clear Recommendations"):
             st.session_state.investment_recommendations = None
             st.rerun()
         
-        st.markdown("---")            
+        st.markdown("---")
 
-    # -------- Portfolio-only Analysis (center) --------
+    # NEW: Display Suggested Allocation (User Story 5)
+    if 'suggested_allocation' in st.session_state and st.session_state.suggested_allocation:
+        alloc_data = st.session_state.suggested_allocation
+        
+        st.subheader(f"🎯 Suggested Portfolio Allocation ({alloc_data['risk_tolerance']} Risk)")
+        
+        allocation = alloc_data['allocation']
+        st.markdown("**Recommended Allocation:**")
+        cols = st.columns(len(allocation))
+        for i, (asset, pct) in enumerate(allocation.items()):
+            with cols[i]:
+                st.metric(asset, f"{pct}%")
+        
+        total = sum(allocation.values())
+        if total != 100:
+            st.warning(f"⚠️ Total: {total}% (should be 100%)")
+        else:
+            st.success(f"✅ Total: {total}%")
+        
+        if 'adjustment_explanation' in alloc_data:
+            st.markdown("---")
+            st.markdown("**💡 Adjustment Explanation:**")
+            st.info(alloc_data['adjustment_explanation'])
+        
+        col_compare1, col_compare2 = st.columns(2)
+        
+        with col_compare1:
+            compare_risk = st.selectbox(
+                "Compare with:",
+                ["Conservative", "Moderate", "Aggressive"],
+                key="compare_risk_select"
+            )
+        
+        with col_compare2:
+            if st.button("🔍 Compare", use_container_width=True):
+                if compare_risk != alloc_data['risk_tolerance']:
+                    with st.spinner(f"Generating {compare_risk} allocation..."):
+                        compare_alloc = suggest_portfolio_allocation(compare_risk)
+                        comparison_text = compare_portfolios(
+                            allocation,
+                            compare_alloc,
+                            alloc_data['risk_tolerance'],
+                            compare_risk
+                        )
+                        
+                        st.session_state.portfolio_comparison = {
+                            'current': {'label': alloc_data['risk_tolerance'], 'allocation': allocation},
+                            'alternative': {'label': compare_risk, 'allocation': compare_alloc},
+                            'comparison': comparison_text
+                        }
+                    st.rerun()
+        
+        if st.session_state.get('portfolio_comparison'):
+            comp_data = st.session_state.portfolio_comparison
+            
+            st.markdown("---")
+            st.markdown("### 📊 Portfolio Comparison")
+            
+            col_port1, col_port2 = st.columns(2)
+            
+            with col_port1:
+                st.markdown(f"**{comp_data['current']['label']}**")
+                for asset, pct in comp_data['current']['allocation'].items():
+                    st.write(f"{asset}: {pct}%")
+            
+            with col_port2:
+                st.markdown(f"**{comp_data['alternative']['label']}**")
+                for asset, pct in comp_data['alternative']['allocation'].items():
+                    st.write(f"{asset}: {pct}%")
+            
+            st.markdown("---")
+            st.markdown("**Analysis:**")
+            st.markdown(comp_data['comparison'])
+            
+            if st.button("🗑️ Clear Comparison"):
+                st.session_state.portfolio_comparison = None
+                st.rerun()
+        
+        if st.button("🗑️ Clear Allocation"):
+            st.session_state.suggested_allocation = None
+            st.session_state.portfolio_comparison = None
+            st.rerun()
+        
+        st.markdown("---")
+
+    # Portfolio-only Analysis
     if st.session_state.portfolio_analysis_only:
         st.subheader("💼 Your Portfolio Analysis")
         pdata = st.session_state.portfolio_analysis_only
@@ -448,7 +731,7 @@ def main():
 
         st.markdown("---")
 
-    # -------- Goal + Progress --------
+    # Goal + Progress
     col1, col2 = st.columns([2, 1])
 
     with col1:
@@ -509,7 +792,7 @@ def main():
         else:
             st.info("Enter a goal to see your progress!")
 
-    # -------- Ask Your Mentor (Concept Explainer) --------
+    # Ask Your Mentor
     st.markdown("---")
     st.subheader("💬 Ask Your Mentor")
     user_question = st.text_input(
@@ -528,7 +811,7 @@ def main():
     if st.session_state.explanation:
         render_explanation_card(st.session_state.explanation, user_question)
 
-    # -------- Display Learning Path --------
+    # Display Learning Path
     gs = st.session_state.get("goal_state")
     if gs and gs.get("subtasks"):
         st.markdown("---")
@@ -585,4 +868,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
