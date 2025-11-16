@@ -305,3 +305,53 @@ python -m unittest tests/test_user_story_7.py -v
 ```bash
 pytest tests/test_user_story_7.py -v
 ```
+
+### User Story 8: Historical Data and Empirical Trends
+**Issue:** [#8](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/8)
+
+**Implementation:**
+- Historical performance data for multiple asset classes with multi-timeframe analysis (10, 20, 30 years)
+- Market event analyzer for major crises (2008 financial crisis, COVID-19 crash, dot-com bubble)
+- Portfolio allocation comparison with historical evidence
+- Educational context and market cycle explanations for all data
+- Built-in knowledge base with AI fallback for custom queries
+- All 3 scenarios implemented and tested
+
+**Changes Made:**
+1. `get_historical_performance()` - Retrieves historical returns for asset classes with market cycle context
+2. `compare_allocation_performance()` - Compares portfolio allocations using historical data
+3. `get_market_event_data()` - Analyzes how different assets performed during major market events
+4. `init_session_state()` - Added `historical_data_display` to session state
+5. Main content - Added Historical Performance Data section with:
+   - Asset class performance selector (Index Funds, S&P 500, Bonds, Stocks)
+   - Market event analyzer (2008 Crisis, COVID Crash, Dot-com Bubble)
+   - Portfolio comparison tool with historical evidence
+   - Display area with context and educational lessons
+
+**Test Results:**
+```bash
+pytest tests/test_user_story_8.py -v
+```
+- ✅ Scenario 1: Historical performance query returns 10/20/30 year data with market cycle context
+- ✅ Scenario 2: Portfolio allocation comparison (60/40 vs 100% stocks) shows historical evidence
+- ✅ Scenario 3: Market event examples (2008, COVID) present asset class behavior with lessons
+
+**UI Features:**
+- Dropdown selector for common asset classes (Index Funds, S&P 500, Bonds, Stocks, Real Estate)
+- Dropdown selector for major market events (2008 Financial Crisis, COVID-19 Crash, Dot-com Bubble)
+- Text input for custom portfolio allocation comparisons (e.g., "60/40" vs "80/20")
+- Historical returns displayed with 10, 20, and 30-year averages
+- Market event analysis showing stock/bond performance during crises
+- Educational context explaining why assets performed as they did
+- Key lessons and takeaways from historical data
+- Built-in knowledge base for instant common queries
+- AI-powered responses for custom asset classes and events
+- Past performance disclaimers on all data
+- Clear button to remove displayed data
+
+## Running Tests
+
+```bash
+# User Story 8: Historical Data
+pytest tests/test_user_story_8.py -v
+```
