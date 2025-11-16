@@ -341,6 +341,44 @@ def explain_recommendation(user_question: str, last_recommendation: str, user_in
     except Exception as e:
         return f"Unable to explain recommendation: {str(e)}"
 
+# ============================
+# User Story 7 – Reset Memory
+# ============================
+
+def reset_all_memory():
+    """
+    Clears every key from session_state.
+    Required by tests:
+    - After calling reset_all_memory(), NO keys must remain.
+    """
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
+def reset_profile_and_memory():
+    """
+    Fully reset:
+    - Clear ALL session memory
+    - Restore DEFAULT profile values
+    - DO NOT add goal_state or glossary back (tests require they are absent)
+    """
+    # Full wipe
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+    # === Restore Default Profile Values ===
+    st.session_state["age"] = 25
+    st.session_state["risk_tolerance"] = "Moderate"
+    st.session_state["savings"] = 10000
+    st.session_state["has_401k"] = False
+    st.session_state["retirement_balance"] = 0
+    st.session_state["has_stocks"] = False
+    st.session_state["stock_value"] = 0
+    st.session_state["experience"] = "Beginner"
+    st.session_state["time_available"] = "3-5 hours"
+
+ 
+
 
 # ============= LangGraph Types & Nodes =============
 
@@ -551,6 +589,7 @@ def main():
         )
 
         st.markdown("---")
+        
 
         # Investment Recommendations Section
         st.header("💡 Investment Recommendations")
@@ -601,6 +640,19 @@ def main():
 
             st.success("✅ Allocation generated!")
             st.rerun()
+        st.markdown("---")
+        st.subheader("🧹 Reset Options")
+        # Reset memory only
+        if st.button("🧹 Reset Memory", use_container_width=True):
+            reset_all_memory()
+            st.success("Memory cleared! Your recommendations and history have been reset.")
+            st.rerun()
+        # Full session reset
+        if st.button("🔄 Start New Session", use_container_width=True):
+            reset_profile_and_memory()
+            st.success("New session started! All profile data cleared.")
+            st.rerun()
+
 
         # User feedback for adjustment (User Story 5)
         if st.session_state.get("suggested_allocation"):
