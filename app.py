@@ -11,6 +11,7 @@ from langgraph.graph import StateGraph, END
 
 # ============= Session & UI Helpers =============
 
+
 def init_session_state():
     ss = st.session_state
     ss.setdefault("goal_state", None)
@@ -18,9 +19,11 @@ def init_session_state():
     ss.setdefault("glossary", [])
     ss.setdefault("portfolio_analysis_only", None)
     ss.setdefault("investment_recommendations", None)
-    ss.setdefault("suggested_allocation", None)  # NEW: User Story 5
-    ss.setdefault("portfolio_comparison", None)  # NEW: User Story 5
-    ss.setdefault("allocation_history", [])      # NEW: User Story 5
+    ss.setdefault("suggested_allocation", None)  # User Story 5
+    ss.setdefault("portfolio_comparison", None)  # User Story 5
+    ss.setdefault("allocation_history", [])      # User Story 5
+    ss.setdefault("reasoning_answer", "")        # NEW: User Story 6
+
 
 def render_explanation_card(text: str, term: str | None = None):
     safe = escape(text).replace("\n", "<br>")
@@ -38,8 +41,9 @@ def render_explanation_card(text: str, term: str | None = None):
             <span style="line-height:1.5;">{safe}</span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
+
 
 # ============= OpenAI Client Setup =============
 
@@ -55,6 +59,7 @@ except Exception as e:
     st.error(f"❌ Error initializing OpenAI: {str(e)}")
     st.stop()
 
+
 def explain_finance_term(term: str) -> str:
     prompt = f"""
 Explain this finance concept simply for a beginner:
@@ -68,36 +73,37 @@ Explain this finance concept simply for a beginner:
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
-        max_tokens=300
+        max_tokens=300,
     )
     return resp.choices[0].message.content.strip()
 
+
 def get_investment_recommendations(risk_tolerance: str, goal: str = "") -> str:
     """Get risk-appropriate investment recommendations"""
-    
+
     risk_profiles = {
         "Conservative": {
             "focus": "capital preservation and steady income",
             "recommended": "government bonds, high-grade corporate bonds, dividend-paying blue-chip stocks, index funds (S&P 500, total market), money market funds, and certificates of deposit (CDs)",
             "avoid": "individual growth stocks, cryptocurrency, options/derivatives, sector-specific ETFs, and high-volatility assets",
-            "note": "While higher-risk options exist (like growth stocks and crypto), they don't align with your conservative approach and could jeopardize your capital."
+            "note": "While higher-risk options exist (like growth stocks and crypto), they don't align with your conservative approach and could jeopardize your capital.",
         },
         "Moderate": {
             "focus": "balanced growth with moderate risk",
             "recommended": "diversified index funds, balanced mutual funds (60/40 stocks/bonds), dividend growth stocks, real estate investment trusts (REITs), target-date retirement funds, and a mix of growth and value stocks",
             "avoid": "highly speculative assets, leveraged ETFs, penny stocks, and concentrated sector bets",
-            "note": "You can consider some growth opportunities while maintaining a defensive position with bonds and stable dividend stocks."
+            "note": "You can consider some growth opportunities while maintaining a defensive position with bonds and stable dividend stocks.",
         },
         "Aggressive": {
             "focus": "maximum growth potential accepting higher volatility",
             "recommended": "growth stocks (especially in technology and emerging sectors), sector-specific ETFs, small-cap and mid-cap stocks, international emerging markets, some cryptocurrency exposure (5-10% max), and actively managed growth funds",
             "avoid": "nothing is off limits, but maintain some diversification",
-            "note": "With aggressive tolerance, you can pursue high-growth opportunities, but remember to diversify across sectors and asset classes to manage downside risk."
-        }
+            "note": "With aggressive tolerance, you can pursue high-growth opportunities, but remember to diversify across sectors and asset classes to manage downside risk.",
+        },
     }
-    
+
     profile = risk_profiles.get(risk_tolerance, risk_profiles["Moderate"])
-    
+
     prompt = f"""You are a financial advisor providing investment recommendations.
 
 Risk Tolerance: {risk_tolerance}
@@ -118,23 +124,25 @@ Provide:
 
 Keep response under 200 words. Be educational and encouraging.
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=400
+            max_tokens=400,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Error getting recommendations: {str(e)}"
 
-# ============= NEW: User Story 5 Functions =============
 
-def suggest_portfolio_allocation(risk_tolerance: str, current_allocation: dict = None) -> dict:
+# ============= User Story 5: Allocation Helpers =============
+
+
+def suggest_portfolio_allocation(risk_tolerance: str, current_allocation: dict | None = None) -> dict:
     """Generate portfolio allocation based on risk tolerance"""
-    
+
     prompt = f"""You are a financial advisor. Suggest a portfolio allocation for a {risk_tolerance} risk tolerance investor.
 
 Current allocation: {json.dumps(current_allocation) if current_allocation else "None - new portfolio"}
@@ -151,37 +159,40 @@ Return ONLY a JSON object with allocation percentages. Example:
 
 Do not include any markdown formatting, just the JSON.
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
-            max_tokens=200
+            max_tokens=200,
         )
-        
+
         content = response.choices[0].message.content.strip()
-        # Remove markdown code blocks if present
         if "```" in content:
             content = content.split("```")[1]
             if content.startswith("json"):
                 content = content[4:]
-        
+
         allocation = json.loads(content.strip())
         return allocation
-    except Exception as e:
-        # Fallback allocations
+    except Exception:
         defaults = {
             "Conservative": {"Bonds": 70, "Stocks": 20, "Cash": 10},
             "Moderate": {"Stocks": 50, "Bonds": 40, "Alternatives": 10},
-            "Aggressive": {"Stocks": 70, "Bonds": 20, "Alternatives": 10}
+            "Aggressive": {"Stocks": 70, "Bonds": 20, "Alternatives": 10},
         }
         return defaults.get(risk_tolerance, defaults["Moderate"])
 
 
-def explain_allocation_change(old_allocation: dict, new_allocation: dict, old_risk: str, new_risk: str) -> str:
+def explain_allocation_change(
+    old_allocation: dict,
+    new_allocation: dict,
+    old_risk: str,
+    new_risk: str,
+) -> str:
     """Explain differences between two allocations"""
-    
+
     prompt = f"""Explain the change from {old_risk} to {new_risk} risk tolerance.
 
 Old allocation ({old_risk}): {json.dumps(old_allocation)}
@@ -194,22 +205,22 @@ Explain in 2-3 sentences:
 
 Keep under 150 words.
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
-            max_tokens=250
+            max_tokens=250,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Unable to generate explanation: {str(e)}"
 
 
-def adjust_allocation_by_feedback(current_allocation: dict, user_feedback: str) -> tuple:
+def adjust_allocation_by_feedback(current_allocation: dict, user_feedback: str) -> tuple[dict, str]:
     """Adjust portfolio based on user feedback"""
-    
+
     prompt = f"""User has this portfolio: {json.dumps(current_allocation)}
 
 User feedback: "{user_feedback}"
@@ -223,30 +234,35 @@ Return a JSON object with this structure:
   "explanation": "Brief explanation of changes and trade-offs"
 }}
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
-            max_tokens=350
+            max_tokens=350,
         )
-        
+
         content = response.choices[0].message.content.strip()
         if "```" in content:
             content = content.split("```")[1]
             if content.startswith("json"):
                 content = content[4:]
-        
+
         result = json.loads(content.strip())
         return result.get("allocation", current_allocation), result.get("explanation", "")
     except Exception as e:
         return current_allocation, f"Could not process feedback: {str(e)}"
 
 
-def compare_portfolios(portfolio1: dict, portfolio2: dict, label1: str, label2: str) -> str:
+def compare_portfolios(
+    portfolio1: dict,
+    portfolio2: dict,
+    label1: str,
+    label2: str,
+) -> str:
     """Compare two portfolio allocations"""
-    
+
     prompt = f"""Compare these two portfolios:
 
 Portfolio 1 ({label1}): {json.dumps(portfolio1)}
@@ -260,19 +276,74 @@ Provide:
 
 Keep under 200 words.
 """
-    
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
-            max_tokens=400
+            max_tokens=400,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Unable to compare portfolios: {str(e)}"
 
+
+# ============= NEW: User Story 6 – Explain "Why?" =============
+
+
+def explain_recommendation(user_question: str, last_recommendation: str, user_info: dict) -> str:
+    """
+    User Story 6: Explain *why* a recommendation was made.
+    Required signature for automated tests.
+    """
+    age = user_info.get("age", "not provided")
+    risk = user_info.get("risk_tolerance", "not provided")
+    time_available = user_info.get("time_available", "not provided")
+    experience = user_info.get("experience", "not provided")
+
+    # Build user background text
+    profile_text = f"""
+    - Age: {age}
+    - Risk Tolerance: {risk}
+    - Experience Level: {experience}
+    - Time Available per Week: {time_available}
+    """
+
+    prompt = f"""
+    A user is asking WHY the following financial recommendation was made:
+
+    Recommendation:
+    "{last_recommendation}"
+
+    User question:
+    "{user_question}"
+
+    User Profile:
+    {profile_text}
+
+    Your task:
+    - Explain the reasoning behind the recommendation
+    - Connect reasoning to age, risk tolerance, diversification, and time horizon
+    - Be concise and educational for beginners
+    - Keep answer under 6 sentences
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=300
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        return f"Unable to explain recommendation: {str(e)}"
+
+
 # ============= LangGraph Types & Nodes =============
+
 
 class GoalState(TypedDict):
     goal: str
@@ -282,6 +353,7 @@ class GoalState(TypedDict):
     messages: List[str]
     portfolio: Dict[str, float]
     portfolio_analysis: str
+
 
 def decompose_goal(state: GoalState) -> GoalState:
     """Decompose user goal into subtasks using OpenAI"""
@@ -327,12 +399,12 @@ Example format:
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=500
+            max_tokens=500,
         )
         response_text = response.choices[0].message.content
 
         lines = [ln for ln in response_text.strip().splitlines() if ln.strip()]
-        subtasks = []
+        subtasks: List[dict] = []
         for idx, ln in enumerate(lines, start=1):
             parts = re.split(r"^\s*\d+[\.\)]\s*", ln, maxsplit=1)
             task_text = parts[-1].strip() if len(parts) > 1 else ln.strip()
@@ -347,6 +419,7 @@ Example format:
         state["messages"].append(f"Error: {str(e)}")
 
     return state
+
 
 def analyze_portfolio(state: GoalState) -> GoalState:
     """Analyze user's portfolio and provide guidance"""
@@ -381,7 +454,7 @@ Format your response in clear sections with headers.
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=800
+            max_tokens=800,
         )
         state["portfolio_analysis"] = response.choices[0].message.content
         state["messages"].append("Portfolio analysis complete")
@@ -390,9 +463,11 @@ Format your response in clear sections with headers.
         state["messages"].append(f"Portfolio analysis error: {str(e)}")
     return state
 
+
 def display_tasks(state: GoalState) -> GoalState:
     state["messages"].append("Tasks ready for display")
     return state
+
 
 def create_goal_mentor_graph():
     workflow = StateGraph(GoalState)
@@ -407,12 +482,18 @@ def create_goal_mentor_graph():
     workflow.set_entry_point("decompose")
     return workflow.compile()
 
+
 graph = create_goal_mentor_graph()
 
 # ============= Streamlit App =============
 
+
 def main():
-    st.set_page_config(page_title="Finance Learning Bot - AI Goal Mentor", page_icon="💰", layout="wide")
+    st.set_page_config(
+        page_title="Finance Learning Bot - AI Goal Mentor",
+        page_icon="💰",
+        layout="wide",
+    )
     init_session_state()
 
     st.title("💰 Finance Learning Bot - AI Goal Mentor")
@@ -422,106 +503,130 @@ def main():
     with st.sidebar:
         st.header("📋 Your Profile")
 
-        experience = st.selectbox("Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"])
-        time_available = st.selectbox("Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"])
+        experience = st.selectbox(
+            "Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"]
+        )
+        time_available = st.selectbox(
+            "Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"]
+        )
         age = st.number_input("Age", min_value=18, max_value=100, value=25)
-        savings = st.number_input("Current Savings ($)", min_value=0, value=10000, step=1000)
+        savings = st.number_input(
+            "Current Savings ($)", min_value=0, value=10000, step=1000
+        )
         has_401k = st.checkbox("I have a 401(k)", value=False)
-        retirement_balance = st.number_input("401(k) Balance ($)", min_value=0, value=0, step=1000) if has_401k else 0
+        retirement_balance = (
+            st.number_input(
+                "401(k) Balance ($)", min_value=0, value=0, step=1000
+            )
+            if has_401k
+            else 0
+        )
         has_stocks = st.checkbox("I own stocks", value=False)
-        stock_value = st.number_input("Stock Portfolio Value ($)", min_value=0, value=0, step=1000) if has_stocks else 0
+        stock_value = (
+            st.number_input(
+                "Stock Portfolio Value ($)", min_value=0, value=0, step=1000
+            )
+            if has_stocks
+            else 0
+        )
 
-        risk_tolerance = st.selectbox("Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1)
-        
+        risk_tolerance = st.selectbox(
+            "Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1
+        )
+
         risk_colors = {
             "Conservative": "🟢",
             "Moderate": "🟡",
-            "Aggressive": "🔴"
+            "Aggressive": "🔴",
         }
-        
+
         risk_descriptions = {
             "Conservative": "Focus: Capital preservation, steady income",
             "Moderate": "Focus: Balanced growth with moderate risk",
-            "Aggressive": "Focus: Maximum growth, higher volatility"
+            "Aggressive": "Focus: Maximum growth, higher volatility",
         }
-        
-        st.info(f"{risk_colors.get(risk_tolerance, '🟡')} **{risk_tolerance}**: {risk_descriptions.get(risk_tolerance, '')}")
-        
+
+        st.info(
+            f"{risk_colors.get(risk_tolerance, '🟡')} **{risk_tolerance}**: {risk_descriptions.get(risk_tolerance, '')}"
+        )
+
         st.markdown("---")
-        
+
         # Investment Recommendations Section
         st.header("💡 Investment Recommendations")
-        
+
         if st.button(
             "📋 Get Risk-Based Recommendations",
             type="secondary",
             use_container_width=True,
-            help=f"Get investment options suitable for {risk_tolerance} risk tolerance"
+            help=f"Get investment options suitable for {risk_tolerance} risk tolerance",
         ):
             with st.spinner("Generating recommendations..."):
                 recommendations = get_investment_recommendations(risk_tolerance, "")
-                
-                st.session_state['investment_recommendations'] = {
-                    'risk_tolerance': risk_tolerance,
-                    'recommendations': recommendations
+
+                st.session_state["investment_recommendations"] = {
+                    "risk_tolerance": risk_tolerance,
+                    "recommendations": recommendations,
                 }
-            
+
             st.success("✅ Recommendations generated!")
             st.rerun()
 
         st.markdown("---")
-        
-        # NEW: Portfolio Allocation Suggestions (User Story 5)
+
+        # Portfolio Allocation Suggestions (User Story 5)
         st.header("📈 Portfolio Allocation")
-        
+
         if st.button(
             "🎯 Suggest Allocation",
             type="secondary",
             use_container_width=True,
-            help=f"Get {risk_tolerance} portfolio allocation suggestion"
+            help=f"Get {risk_tolerance} portfolio allocation suggestion",
         ):
             with st.spinner(f"Generating {risk_tolerance} allocation..."):
                 allocation = suggest_portfolio_allocation(risk_tolerance)
-                
-                st.session_state['suggested_allocation'] = {
-                    'risk_tolerance': risk_tolerance,
-                    'allocation': allocation,
-                    'timestamp': 'current'
+
+                st.session_state["suggested_allocation"] = {
+                    "risk_tolerance": risk_tolerance,
+                    "allocation": allocation,
+                    "timestamp": "current",
                 }
-                
-                st.session_state.allocation_history.append({
-                    'label': f"{risk_tolerance} Allocation",
-                    'allocation': allocation
-                })
-            
+
+                st.session_state.allocation_history.append(
+                    {
+                        "label": f"{risk_tolerance} Allocation",
+                        "allocation": allocation,
+                    }
+                )
+
             st.success("✅ Allocation generated!")
             st.rerun()
-        
-        # NEW: User feedback for adjustment (User Story 5)
-        if st.session_state.get('suggested_allocation'):
+
+        # User feedback for adjustment (User Story 5)
+        if st.session_state.get("suggested_allocation"):
             st.markdown("**Adjust Allocation:**")
             user_adjustment = st.text_input(
                 "Feedback",
                 placeholder="e.g., 'I want more stocks' or 'Less bonds'",
-                key="user_adjustment_input"
+                key="user_adjustment_input",
             )
-            
+
             if st.button("🔧 Adjust", use_container_width=True):
                 if user_adjustment.strip():
-                    current_alloc = st.session_state.suggested_allocation['allocation']
-                    
+                    current_alloc = st.session_state.suggested_allocation["allocation"]
+
                     with st.spinner("Adjusting allocation..."):
                         new_alloc, explanation = adjust_allocation_by_feedback(
                             current_alloc, user_adjustment
                         )
-                        
+
                         st.session_state.suggested_allocation = {
-                            'risk_tolerance': risk_tolerance,
-                            'allocation': new_alloc,
-                            'adjustment_explanation': explanation,
-                            'timestamp': 'adjusted'
+                            "risk_tolerance": risk_tolerance,
+                            "allocation": new_alloc,
+                            "adjustment_explanation": explanation,
+                            "timestamp": "adjusted",
                         }
-                    
+
                     st.success("✅ Adjusted!")
                     st.rerun()
 
@@ -530,52 +635,94 @@ def main():
         st.markdown("*Get personalized portfolio guidance*")
 
         st.markdown("**Current Asset Allocation (%)**")
-        stocks = st.number_input("Stocks", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="stocks")
-        bonds = st.number_input("Bonds", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="bonds")
-        cash = st.number_input("Cash/Savings", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="cash")
-        real_estate = st.number_input("Real Estate", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="real_estate")
-        crypto = st.number_input("Cryptocurrency", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="crypto")
-        other = st.number_input("Other", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="other")
+        stocks = st.number_input(
+            "Stocks", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="stocks"
+        )
+        bonds = st.number_input(
+            "Bonds", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="bonds"
+        )
+        cash = st.number_input(
+            "Cash/Savings",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=5.0,
+            key="cash",
+        )
+        real_estate = st.number_input(
+            "Real Estate",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=5.0,
+            key="real_estate",
+        )
+        crypto = st.number_input(
+            "Cryptocurrency",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=5.0,
+            key="crypto",
+        )
+        other = st.number_input(
+            "Other", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="other"
+        )
 
         total_allocation = stocks + bonds + cash + real_estate + crypto + other
         if total_allocation == 100:
             st.success(f"✅ Total Allocation: {total_allocation}%")
         elif total_allocation > 0:
-            st.warning(f"⚠️ Total Allocation: {total_allocation}% (Must be 100%)")
+            st.warning(
+                f"⚠️ Total Allocation: {total_allocation}% (Must be 100%)"
+            )
         else:
             st.info("💡 Total Allocation: 0% (Enter your portfolio)")
 
-        analyze_enabled = (total_allocation == 100.0)
+        analyze_enabled = total_allocation == 100.0
         if st.button(
             "🔍 Analyze Portfolio",
             type="primary",
             disabled=not analyze_enabled,
-            help="Total allocation must equal 100% to analyze" if not analyze_enabled else "Click to analyze your portfolio",
-            use_container_width=True
+            help=(
+                "Total allocation must equal 100% to analyze"
+                if not analyze_enabled
+                else "Click to analyze your portfolio"
+            ),
+            use_container_width=True,
         ):
-            portfolio = {}
-            if stocks > 0: portfolio["Stocks"] = stocks
-            if bonds > 0: portfolio["Bonds"] = bonds
-            if cash > 0: portfolio["Cash"] = cash
-            if real_estate > 0: portfolio["Real Estate"] = real_estate
-            if crypto > 0: portfolio["Cryptocurrency"] = crypto
-            if other > 0: portfolio["Other"] = other
+            portfolio: Dict[str, float] = {}
+            if stocks > 0:
+                portfolio["Stocks"] = stocks
+            if bonds > 0:
+                portfolio["Bonds"] = bonds
+            if cash > 0:
+                portfolio["Cash"] = cash
+            if real_estate > 0:
+                portfolio["Real Estate"] = real_estate
+            if crypto > 0:
+                portfolio["Cryptocurrency"] = crypto
+            if other > 0:
+                portfolio["Other"] = other
 
             with st.spinner("Analyzing your portfolio..."):
-                portfolio_state = {
+                portfolio_state: GoalState = {
                     "goal": "",
                     "subtasks": [],
                     "completed_tasks": [],
-                    "user_info": {"experience": experience.lower(), "time": time_available},
+                    "user_info": {
+                        "experience": experience.lower(),
+                        "time": time_available,
+                    },
                     "messages": [],
                     "portfolio": portfolio,
-                    "portfolio_analysis": ""
+                    "portfolio_analysis": "",
                 }
                 analyzed_state = analyze_portfolio(portfolio_state)
 
                 st.session_state.portfolio_analysis_only = {
                     "portfolio": portfolio,
-                    "analysis": analyzed_state.get("portfolio_analysis", "")
+                    "analysis": analyzed_state.get("portfolio_analysis", ""),
                 }
 
             st.success("✅ Portfolio analysis complete!")
@@ -583,7 +730,9 @@ def main():
 
         st.markdown("---")
         st.markdown("### About")
-        st.info("This AI mentor breaks down learning goals and provides portfolio guidance.")
+        st.info(
+            "This AI mentor breaks down learning goals and provides portfolio guidance."
+        )
 
         if st.session_state.glossary:
             st.markdown("---")
@@ -597,114 +746,131 @@ def main():
                 if st.button("🧹 Clear Glossary"):
                     st.session_state.glossary = []
                     st.session_state.explanation = ""
+                    st.session_state.reasoning_answer = ""
                     st.rerun()
             with col_g2:
-                export = "\n\n".join([f"{i+1}. {t}\n{d}" for i, (t, d) in enumerate(st.session_state.glossary)])
+                export = "\n\n".join(
+                    [f"{i+1}. {t}\n{d}" for i, (t, d) in enumerate(st.session_state.glossary)]
+                )
                 st.download_button(
                     "⬇️ Download",
                     data=export.encode("utf-8"),
                     file_name="glossary.txt",
-                    mime="text/plain"
+                    mime="text/plain",
                 )
 
     # -------- Main Content --------
 
     # Display Investment Recommendations
-    if 'investment_recommendations' in st.session_state and st.session_state.investment_recommendations:
+    if (
+        "investment_recommendations" in st.session_state
+        and st.session_state.investment_recommendations
+    ):
         rec_data = st.session_state.investment_recommendations
-        
+
         st.subheader(f"💡 Investment Recommendations ({rec_data['risk_tolerance']} Risk)")
-        st.markdown(rec_data['recommendations'])
-        
+        st.markdown(rec_data["recommendations"])
+
         if st.button("🗑️ Clear Recommendations"):
             st.session_state.investment_recommendations = None
             st.rerun()
-        
+
         st.markdown("---")
 
-    # NEW: Display Suggested Allocation (User Story 5)
-    if 'suggested_allocation' in st.session_state and st.session_state.suggested_allocation:
+    # Display Suggested Allocation (User Story 5)
+    if (
+        "suggested_allocation" in st.session_state
+        and st.session_state.suggested_allocation
+    ):
         alloc_data = st.session_state.suggested_allocation
-        
-        st.subheader(f"🎯 Suggested Portfolio Allocation ({alloc_data['risk_tolerance']} Risk)")
-        
-        allocation = alloc_data['allocation']
+
+        st.subheader(
+            f"🎯 Suggested Portfolio Allocation ({alloc_data['risk_tolerance']} Risk)"
+        )
+
+        allocation = alloc_data["allocation"]
         st.markdown("**Recommended Allocation:**")
         cols = st.columns(len(allocation))
         for i, (asset, pct) in enumerate(allocation.items()):
             with cols[i]:
                 st.metric(asset, f"{pct}%")
-        
+
         total = sum(allocation.values())
         if total != 100:
             st.warning(f"⚠️ Total: {total}% (should be 100%)")
         else:
             st.success(f"✅ Total: {total}%")
-        
-        if 'adjustment_explanation' in alloc_data:
+
+        if "adjustment_explanation" in alloc_data:
             st.markdown("---")
             st.markdown("**💡 Adjustment Explanation:**")
-            st.info(alloc_data['adjustment_explanation'])
-        
+            st.info(alloc_data["adjustment_explanation"])
+
         col_compare1, col_compare2 = st.columns(2)
-        
+
         with col_compare1:
             compare_risk = st.selectbox(
                 "Compare with:",
                 ["Conservative", "Moderate", "Aggressive"],
-                key="compare_risk_select"
+                key="compare_risk_select",
             )
-        
+
         with col_compare2:
             if st.button("🔍 Compare", use_container_width=True):
-                if compare_risk != alloc_data['risk_tolerance']:
+                if compare_risk != alloc_data["risk_tolerance"]:
                     with st.spinner(f"Generating {compare_risk} allocation..."):
                         compare_alloc = suggest_portfolio_allocation(compare_risk)
                         comparison_text = compare_portfolios(
                             allocation,
                             compare_alloc,
-                            alloc_data['risk_tolerance'],
-                            compare_risk
+                            alloc_data["risk_tolerance"],
+                            compare_risk,
                         )
-                        
+
                         st.session_state.portfolio_comparison = {
-                            'current': {'label': alloc_data['risk_tolerance'], 'allocation': allocation},
-                            'alternative': {'label': compare_risk, 'allocation': compare_alloc},
-                            'comparison': comparison_text
+                            "current": {
+                                "label": alloc_data["risk_tolerance"],
+                                "allocation": allocation,
+                            },
+                            "alternative": {
+                                "label": compare_risk,
+                                "allocation": compare_alloc,
+                            },
+                            "comparison": comparison_text,
                         }
                     st.rerun()
-        
-        if st.session_state.get('portfolio_comparison'):
+
+        if st.session_state.get("portfolio_comparison"):
             comp_data = st.session_state.portfolio_comparison
-            
+
             st.markdown("---")
             st.markdown("### 📊 Portfolio Comparison")
-            
+
             col_port1, col_port2 = st.columns(2)
-            
+
             with col_port1:
                 st.markdown(f"**{comp_data['current']['label']}**")
-                for asset, pct in comp_data['current']['allocation'].items():
+                for asset, pct in comp_data["current"]["allocation"].items():
                     st.write(f"{asset}: {pct}%")
-            
+
             with col_port2:
                 st.markdown(f"**{comp_data['alternative']['label']}**")
-                for asset, pct in comp_data['alternative']['allocation'].items():
+                for asset, pct in comp_data["alternative"]["allocation"].items():
                     st.write(f"{asset}: {pct}%")
-            
+
             st.markdown("---")
             st.markdown("**Analysis:**")
-            st.markdown(comp_data['comparison'])
-            
+            st.markdown(comp_data["comparison"])
+
             if st.button("🗑️ Clear Comparison"):
                 st.session_state.portfolio_comparison = None
                 st.rerun()
-        
+
         if st.button("🗑️ Clear Allocation"):
             st.session_state.suggested_allocation = None
             st.session_state.portfolio_comparison = None
             st.rerun()
-        
+
         st.markdown("---")
 
     # Portfolio-only Analysis
@@ -738,22 +904,31 @@ def main():
         st.subheader("🎯 Enter Your Financial Learning Goal")
         goal_input = st.text_area(
             "What would you like to learn about finance?",
-            placeholder="Example: Learn about stock market investing, Understand retirement planning, Master personal budgeting...",
-            height=100
+            placeholder=(
+                "Example: Learn about stock market investing, Understand retirement "
+                "planning, Master personal budgeting..."
+            ),
+            height=100,
         )
 
         if st.button("🚀 Generate Learning Path", type="primary"):
             if goal_input.strip():
                 with st.spinner("Creating your personalized learning path..."):
-                    portfolio = {}
-                    if stocks > 0: portfolio["Stocks"] = stocks
-                    if bonds > 0: portfolio["Bonds"] = bonds
-                    if cash > 0: portfolio["Cash"] = cash
-                    if real_estate > 0: portfolio["Real Estate"] = real_estate
-                    if crypto > 0: portfolio["Cryptocurrency"] = crypto
-                    if other > 0: portfolio["Other"] = other
+                    portfolio_for_goal: Dict[str, float] = {}
+                    if stocks > 0:
+                        portfolio_for_goal["Stocks"] = stocks
+                    if bonds > 0:
+                        portfolio_for_goal["Bonds"] = bonds
+                    if cash > 0:
+                        portfolio_for_goal["Cash"] = cash
+                    if real_estate > 0:
+                        portfolio_for_goal["Real Estate"] = real_estate
+                    if crypto > 0:
+                        portfolio_for_goal["Cryptocurrency"] = crypto
+                    if other > 0:
+                        portfolio_for_goal["Other"] = other
 
-                    initial_state = {
+                    initial_state: GoalState = {
                         "goal": goal_input,
                         "subtasks": [],
                         "completed_tasks": [],
@@ -766,11 +941,11 @@ def main():
                             "has_stocks": has_stocks,
                             "stock_value": stock_value,
                             "experience": experience.lower(),
-                            "time": time_available
+                            "time": time_available,
                         },
                         "messages": [],
-                        "portfolio": portfolio,
-                        "portfolio_analysis": ""
+                        "portfolio": portfolio_for_goal,
+                        "portfolio_analysis": "",
                     }
                     result = graph.invoke(initial_state)
                     st.session_state.goal_state = result
@@ -784,7 +959,7 @@ def main():
         if gs and gs.get("subtasks"):
             total_tasks = len(gs["subtasks"])
             completed = sum(1 for t in gs["subtasks"] if t["completed"])
-            progress = (completed / total_tasks * 100) if total_tasks > 0 else 0
+            progress = (completed / total_tasks * 100) if total_tasks > 0 else 0.0
             st.metric("Total Tasks", total_tasks)
             st.metric("Completed", completed)
             st.progress(progress / 100)
@@ -792,12 +967,12 @@ def main():
         else:
             st.info("Enter a goal to see your progress!")
 
-    # Ask Your Mentor
+    # Ask Your Mentor (concept explanations)
     st.markdown("---")
     st.subheader("💬 Ask Your Mentor")
     user_question = st.text_input(
         "Confused about a financial term?",
-        placeholder="Example: What is a dividend yield?"
+        placeholder="Example: What is a dividend yield?",
     )
     if st.button("❓ Explain This"):
         if user_question.strip():
@@ -810,6 +985,44 @@ def main():
             st.warning("Please enter a question.")
     if st.session_state.explanation:
         render_explanation_card(st.session_state.explanation, user_question)
+
+    # NEW: User Story 6 – "Why?" about recommendations
+    st.markdown("---")
+    st.subheader("🤔 Ask 'Why?' About My Plan")
+    why_q = st.text_input(
+        "Ask why the bot recommended something (allocations, avoiding assets, or the learning order).",
+        placeholder=(
+            'Examples: "Why 30% in bonds and not 20%?", '
+            '"Why not cryptocurrency?", '
+            '"Why learn about bonds before stocks?"'
+        ),
+    )
+
+    if st.button("🧠 Explain the reasoning"):
+        if why_q.strip():
+            with st.spinner("Explaining the reasoning behind your recommendations..."):
+                reasoning = explain_recommendation(
+                    why_q,
+                    risk_tolerance=risk_tolerance,
+                    age=age,
+                    time_available=time_available,
+                    experience=experience,
+                    suggested_allocation=st.session_state.get("suggested_allocation"),
+                    investment_recs=st.session_state.get("investment_recommendations"),
+                    goal_state=st.session_state.get("goal_state"),
+                )
+                st.session_state.reasoning_answer = reasoning
+                # Save to glossary so user can review later
+                st.session_state.glossary.append((f"Why: {why_q}", reasoning))
+            st.success("✅ Reasoning explained!")
+        else:
+            st.warning("Please type a 'why' question first.")
+
+    if st.session_state.get("reasoning_answer"):
+        render_explanation_card(
+            st.session_state.reasoning_answer,
+            term="Why this recommendation?",
+        )
 
     # Display Learning Path
     gs = st.session_state.get("goal_state")
@@ -863,8 +1076,9 @@ def main():
                     label="Download as Text",
                     data=export_text,
                     file_name="learning_path.txt",
-                    mime="text/plain"
+                    mime="text/plain",
                 )
+
 
 if __name__ == "__main__":
     main()
