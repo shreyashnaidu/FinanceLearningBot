@@ -23,6 +23,7 @@ def init_session_state():
     ss.setdefault("portfolio_comparison", None)  # User Story 5
     ss.setdefault("allocation_history", [])      # User Story 5
     ss.setdefault("reasoning_answer", "")        # NEW: User Story 6
+    ss.setdefault("historical_data_display", None) 
 
 
 def render_explanation_card(text: str, term: str | None = None):
@@ -287,6 +288,182 @@ Keep under 200 words.
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Unable to compare portfolios: {str(e)}"
+
+
+def get_historical_performance(asset_class: str) -> str:
+    """Get historical performance data for an asset class"""
+    
+    # Historical data knowledge base
+    historical_data = {
+        "index funds": {
+            "10_year": "~12%",
+            "20_year": "~10%",
+            "30_year": "~10%",
+            "context": "Includes recovery from 2008 financial crisis and COVID-19 pandemic bounce-back. Strong long-term growth despite short-term volatility."
+        },
+        "s&p 500": {
+            "10_year": "~12%",
+            "20_year": "~10%",
+            "30_year": "~10%",
+            "context": "Major US stock index showing consistent long-term growth. Experienced significant drops in 2000-2002 (dot-com), 2008 (financial crisis), and 2020 (COVID)."
+        },
+        "bonds": {
+            "10_year": "~3-4%",
+            "20_year": "~4-5%",
+            "30_year": "~5-6%",
+            "context": "Lower but steadier returns than stocks. Performed well during stock market crashes, providing portfolio stability."
+        },
+        "stocks": {
+            "10_year": "~11-13%",
+            "20_year": "~9-11%",
+            "30_year": "~10%",
+            "context": "Higher volatility but strong long-term returns. Best performance over extended periods despite periodic crashes."
+        }
+    }
+    
+    # Normalize input
+    asset_key = asset_class.lower().strip()
+    
+    # Get data or use generic response
+    if asset_key in historical_data:
+        data = historical_data[asset_key]
+        base_response = f"""**Historical Performance of {asset_class.title()}:**
+
+**Returns:**
+- **10-year average:** {data['10_year']} annually
+- **20-year average:** {data['20_year']} annually
+- **30-year average:** {data['30_year']} annually
+
+**Context:** {data['context']}
+
+*Note: Past performance doesn't guarantee future results. These are approximate historical averages.*"""
+    else:
+        # Use AI for assets not in knowledge base
+        prompt = f"""Provide historical performance data for {asset_class}.
+
+Include:
+1. Average annual returns over 10, 20, and 30 years
+2. Brief context about market cycles that affected performance
+3. Notable periods of high/low performance
+
+Keep response under 200 words. Use approximate historical data.
+Add disclaimer about past performance.
+"""
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=300
+            )
+            base_response = response.choices[0].message.content.strip()
+        except Exception as e:
+            base_response = f"Unable to retrieve historical data for {asset_class}: {str(e)}"
+    
+    return base_response
+
+
+def compare_allocation_performance(allocation1_desc: str, allocation2_desc: str) -> str:
+    """Compare historical performance of different portfolio allocations"""
+    
+    prompt = f"""Compare historical performance of these portfolios:
+
+**Portfolio 1:** {allocation1_desc}
+**Portfolio 2:** {allocation2_desc}
+
+Provide:
+1. Historical average annual returns for each (use approximate data)
+2. Volatility comparison (which had bigger swings)
+3. Which performed better in different market conditions (bull markets, bear markets, recessions)
+4. Risk/return trade-off analysis
+
+Keep under 250 words. Be educational and use historical evidence.
+Include disclaimer about past performance.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=400
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Unable to compare allocations: {str(e)}"
+
+
+def get_market_event_data(event: str) -> str:
+    """Get data about how assets performed during major market events"""
+    
+    # Known market events
+    market_events = {
+        "2008 financial crisis": {
+            "description": "Global financial crisis triggered by mortgage-backed securities collapse",
+            "stocks": "S&P 500 fell ~37% in 2008, recovered within 5 years",
+            "bonds": "US Treasury bonds gained value as safe haven, +5-10%",
+            "lessons": "Diversification helped. All-stock portfolios suffered most. Bonds provided stability. Long-term investors who held recovered."
+        },
+        "covid-19 crash": {
+            "description": "Pandemic-driven market crash in March 2020",
+            "stocks": "S&P 500 dropped ~34% in one month, but recovered to new highs within 6 months",
+            "bonds": "Treasury bonds remained stable, some gains",
+            "lessons": "Fastest crash and fastest recovery in history. Stay-at-home stocks thrived. Market recovery defied economic downturn."
+        },
+        "dot-com bubble": {
+            "description": "Tech stock bubble burst in 2000-2002",
+            "stocks": "Nasdaq fell ~78% from peak, S&P 500 fell ~49%",
+            "bonds": "Bonds outperformed as investors fled to safety",
+            "lessons": "Speculation in unproven companies dangerous. Diversification critical. Tech concentration very risky."
+        }
+    }
+    
+    event_lower = event.lower().strip()
+    
+    # Find matching event
+    matched_event = None
+    for key in market_events:
+        if key in event_lower or event_lower in key:
+            matched_event = market_events[key]
+            break
+    
+    if matched_event:
+        response = f"""**{event.title()}**
+
+**What Happened:** {matched_event['description']}
+
+**Asset Performance:**
+- **Stocks:** {matched_event['stocks']}
+- **Bonds:** {matched_event['bonds']}
+
+**Key Lessons:** {matched_event['lessons']}
+
+*Historical data shows the importance of diversification and long-term perspective during market crises.*"""
+    else:
+        # Use AI for events not in knowledge base
+        prompt = f"""Describe how different asset classes performed during the {event}.
+
+Include:
+1. What happened during this event
+2. How stocks, bonds, and cash performed (use percentages if possible)
+3. Key lessons for investors
+
+Keep under 200 words. Focus on educational value.
+"""
+        
+        try:
+            ai_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=300
+            )
+            response = ai_response.choices[0].message.content.strip()
+        except Exception as e:
+            response = f"Unable to retrieve data for {event}: {str(e)}"
+    
+    return response
 
 
 # ============= NEW: User Story 6 – Explain "Why?" =============
@@ -1049,6 +1226,105 @@ def main():
             '"Why learn about bonds before stocks?"'
         ),
     )
+
+    st.markdown("---")
+    st.subheader("📊 Historical Performance Data")
+    
+    col_hist1, col_hist2 = st.columns(2)
+    
+    with col_hist1:
+        st.markdown("**Asset Class Performance**")
+        asset_query = st.selectbox(
+            "Select Asset Class:",
+            ["Index Funds", "S&P 500", "Bonds", "Stocks", "Real Estate", "Other"],
+            key="asset_performance_select"
+        )
+        
+        if st.button("📈 View Historical Performance", use_container_width=True):
+            with st.spinner(f"Retrieving data for {asset_query}..."):
+                hist_data = get_historical_performance(asset_query)
+                st.session_state.historical_data_display = {
+                    'type': 'asset_performance',
+                    'data': hist_data,
+                    'asset': asset_query
+                }
+            st.rerun()
+    
+    with col_hist2:
+        st.markdown("**Market Events Analysis**")
+        event_query = st.selectbox(
+            "Select Market Event:",
+            ["2008 Financial Crisis", "COVID-19 Crash", "Dot-com Bubble", "Other"],
+            key="market_event_select"
+        )
+        
+        if st.button("📉 View Event Impact", use_container_width=True):
+            with st.spinner(f"Analyzing {event_query}..."):
+                event_data = get_market_event_data(event_query)
+                st.session_state.historical_data_display = {
+                    'type': 'market_event',
+                    'data': event_data,
+                    'event': event_query
+                }
+            st.rerun()
+    
+    # Display historical data if exists
+    if st.session_state.get('historical_data_display'):
+        hist_display = st.session_state.historical_data_display
+        st.markdown("---")
+        
+        if hist_display['type'] == 'asset_performance':
+            st.markdown(f"### 📊 {hist_display['asset']} - Historical Performance")
+            st.markdown(hist_display['data'])
+        elif hist_display['type'] == 'market_event':
+            st.markdown(f"### 📉 {hist_display['event']} - Impact Analysis")
+            st.markdown(hist_display['data'])
+        elif hist_display['type'] == 'allocation_comparison':
+            st.markdown("### 📊 Portfolio Allocation Comparison")
+            st.markdown(hist_display['data'])
+        
+        if st.button("🗑️ Clear Historical Data"):
+            st.session_state.historical_data_display = None
+            st.rerun()
+        
+        st.markdown("---")
+    
+    # Portfolio comparison with historical evidence
+    st.markdown("**Compare Portfolio Allocations (Historical Evidence)**")
+    
+    col_comp1, col_comp2, col_comp3 = st.columns(3)
+    
+    with col_comp1:
+        alloc1 = st.text_input(
+            "Portfolio 1:",
+            placeholder="e.g., 60% stocks / 40% bonds",
+            key="hist_alloc1"
+        )
+    
+    with col_comp2:
+        alloc2 = st.text_input(
+            "Portfolio 2:",
+            placeholder="e.g., 100% stocks",
+            key="hist_alloc2"
+        )
+    
+    with col_comp3:
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        if st.button("⚖️ Compare", use_container_width=True):
+            if alloc1.strip() and alloc2.strip():
+                with st.spinner("Comparing historical performance..."):
+                    comparison = compare_allocation_performance(alloc1, alloc2)
+                    st.session_state.historical_data_display = {
+                        'type': 'allocation_comparison',
+                        'data': comparison,
+                        'alloc1': alloc1,
+                        'alloc2': alloc2
+                    }
+                st.rerun()
+            else:
+                st.warning("Please enter both portfolio allocations to compare")
+
+    st.markdown("---")
 
     if st.button("🧠 Explain the reasoning"):
         if why_q.strip():
