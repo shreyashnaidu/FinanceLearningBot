@@ -381,3 +381,33 @@ python -m tests/test_user_story_9.py
 - ✅ Scenario 2: Compare 80/20 vs 60/40 strategies with performance metrics
 - ✅ Scenario 3: Portfolio performance during 2008 crisis with explanations
 - ✅ Additional: COVID-19 crash, dot-com bubble, multiple time periods
+
+### User Story 10: Account Information and Portfolio Snapshot ✅
+**Issue:** [#10](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/10)
+
+**Implementation:**
+- Save portfolio snapshots with custom names (persists to disk)
+- Load previously saved portfolios after app restart
+- Manage multiple saved portfolios (view, load, delete)
+- Export portfolios to .portfolio files for backup/sharing
+- Import portfolios from .portfolio files
+- Snapshots include: profile, portfolio allocation, learning progress, glossary
+
+**Changes Made:**
+1. `save_portfolio_snapshot()` - Saves session state to JSON file on disk
+2. `load_all_saved_portfolios()` - Loads all saved portfolios from disk
+3. `delete_portfolio_snapshot()` - Deletes portfolio file from disk
+4. `apply_pending_load()` - Applies portfolio load before widgets are created
+5. `serialize_snapshot()` / `deserialize_snapshot()` - Export/import functionality
+6. File storage - `saved_portfolios/` directory for persistent storage
+7. Session state - `_pending_load` for two-step load process, `load_message` for notifications
+8. UI - Save/Load section in sidebar with portfolio management and export/import
+
+**Test Results:**
+```bash
+python tests/test_user_story_10.py
+```
+- ✅ Scenario 1: Save portfolio with holdings and learning progress to disk
+- ✅ Scenario 2: Load previous session after restart, restoring all details
+- ✅ Scenario 3: Manage multiple portfolios (select, load, delete from disk)
+- ✅ Additional: Persistence across sessions, serialization, empty state handling
