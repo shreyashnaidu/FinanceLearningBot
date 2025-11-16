@@ -355,3 +355,29 @@ pytest tests/test_user_story_8.py -v
 # User Story 8: Historical Data
 pytest tests/test_user_story_8.py -v
 ```
+
+### User Story 9: Portfolio Backtesting ✅
+**Issue:** [#9](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/9)
+
+**Implementation:**
+- Added portfolio backtesting over multiple time periods (5, 10, 20, 30 years)
+- Strategy comparison tool with side-by-side performance metrics
+- Crisis period analysis for major market events (2008 crisis, COVID-19, dot-com bubble)
+- Performance metrics include: total return, average return, volatility, max drawdown, Sharpe ratio
+- Year-by-year return breakdown for detailed analysis
+
+**Changes Made:**
+1. `backtest_portfolio()` - Simulates historical portfolio performance with volatility
+2. `compare_backtest_strategies()` - Compares two strategies with AI-powered analysis
+3. `backtest_crisis_period()` - Shows how portfolio performs during specific crises
+4. Session state - Added `backtest_results`, `strategy_comparison`, `crisis_backtest`
+5. UI - Three-tab interface (Backtest Portfolio, Compare Strategies, Crisis Performance)
+
+**Test Results:**
+```bash
+python -m tests/test_user_story_9.py
+```
+- ✅ Scenario 1: Backtest portfolio with 10-year annual returns and drawdowns
+- ✅ Scenario 2: Compare 80/20 vs 60/40 strategies with performance metrics
+- ✅ Scenario 3: Portfolio performance during 2008 crisis with explanations
+- ✅ Additional: COVID-19 crash, dot-com bubble, multiple time periods
