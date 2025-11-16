@@ -220,3 +220,42 @@ pytest tests/test_user_story_5.py -v
 ```bash
 pytest tests/test_user_story_5.py -v
 ```
+
+### User Story 6: Explain “Why?” Behind Recommendations
+**Issue:** [#6](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/6)
+
+**Implementation:**
+- Added an AI explanation engine for answering “why” questions about portfolio or learning recommendations  
+- System explains reasoning based on user profile (age, risk tolerance, time horizon, experience)
+- Supports explaining:
+  - Portfolio allocations (e.g., “Why 30% bonds instead of 20%?”)
+  - Risk-based exclusions (e.g., “Why avoid cryptocurrency?”)
+  - Learning path ordering (e.g., “Why learn bonds before stocks?”)
+- Uses investment principles (diversification, volatility, compounding, risk/return) in explanations
+- Designed for short, clear, beginner-friendly reasoning
+- All 3 scenarios implemented and tested
+
+**Changes Made:**
+1. `explain_recommendation()` — NEW core function to explain recommendations using user info + previous outputs  
+2. Added structured reasoning prompt referencing allocation, recommendations, and learning path  
+3. Session state support for storing last allocation, last recommendations, and goal state for explanation  
+4. Modular design for reuse across different recommendation types (portfolio or learning tasks)  
+5. Optional UI additions for “Why?” questions and reasoning display  
+
+**Test Results:**
+```bash
+python -m unittest tests/test_user_story_6.py -v
+```
+✅ Scenario 1: Allocation explanation (why 30% bonds vs 20%)
+✅ Scenario 2: Explanation for avoiding cryptocurrency tailored to risk tolerance
+✅ Scenario 3: Learning path reasoning (why study bonds before stocks)
+
+**UI Features:**
+- “Explain This” input box for asking any “why” question connected to prior recommendations
+- AI-generated reasoning displayed in a clean formatted explanation card
+- Explanations automatically connect to user profile (age, risk tolerance, time horizon, experience)
+- Works for portfolio suggestions, investment warnings, and learning path sequences
+- Responses limited to ~200 words for readability
+- Allocation history tracking for reviewing past suggestions
+- Fully integrated with existing sidebar + main content workflow
+- Real-time allocation totals with validation (must sum to 100%)
