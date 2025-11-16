@@ -1,8 +1,8 @@
 """
-Test cases for User Story: Portfolio Guidance and Health Assessment
+Test cases for User Story 2: Portfolio Guidance and Health Assessment
 Reference: GitHub Issue #2
-Install pytest if not already installed: pip install pytest
-Run with: pytest tests/test_portfolio_guidance.py -v
+
+Run with: pytest tests/test_user_story_2.py -v
 """
 
 import pytest

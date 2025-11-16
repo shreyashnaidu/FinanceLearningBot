@@ -136,6 +136,9 @@ python -m unittest tests/test_user_story_3.py -v
 python -m unittest discover -s tests -p "test_*.py" -v
 
 ```
+
+## Second Iteration
+
 ### User Story 4: Risk Tolerance Configuration 
 **Issue:** [#4](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/4)
 
@@ -173,4 +176,47 @@ pytest tests/test_user_story_4.py -v
 ```bash
 # User Story 4: Risk Tolerance
 pytest tests/test_user_story_4.py -v
+```
+
+### User Story 5: Risk-Based Portfolio Adjustment (Human-in-the-Loop)
+**Issue:** [#5](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/5)
+
+**Implementation:**
+- Portfolio allocation suggestions based on risk tolerance (Conservative/Moderate/Aggressive)
+- User feedback processing to adjust allocations ("I want more stocks")
+- Side-by-side portfolio comparison with different risk levels
+- Automatic explanation of allocation changes and trade-offs
+- Allocation history tracking for comparison
+- All 3 scenarios implemented and tested
+
+**Changes Made:**
+1. `suggest_portfolio_allocation()` - Generates risk-appropriate portfolio allocations with AI
+2. `explain_allocation_change()` - Explains differences between old and new allocations
+3. `adjust_allocation_by_feedback()` - Processes natural language user feedback to modify portfolios
+4. `compare_portfolios()` - Compares two portfolios with risk/return analysis
+5. `init_session_state()` - Added `suggested_allocation`, `portfolio_comparison`, `allocation_history` to session state
+6. Sidebar - Added "Suggest Allocation" button and user feedback adjustment interface
+7. Main content - Added allocation display with metrics, comparison selector, and side-by-side view
+
+**Test Results:**
+```bash
+pytest tests/test_user_story_5.py -v
+```
+- ✅ Scenario 1: Risk change (Conservative→Moderate) updates allocation (70% bonds→50% stocks/40% bonds)
+- ✅ Scenario 2: User feedback ("I want more stocks") adjusts portfolio with trade-off explanation
+- ✅ Scenario 3: Alternative portfolio comparison (Moderate vs Aggressive) shows differences and risk metrics
+
+**UI Features:**
+- "Suggest Allocation" button generates risk-based portfolio recommendations (Conservative: 70% bonds, Moderate: 50% stocks, Aggressive: 70% stocks)
+- User feedback input to adjust allocations in natural language ("I want more stocks", "Less bonds")
+- Compare current allocation with alternative risk levels (dropdown + compare button)
+- Side-by-side portfolio comparison with detailed risk/return analysis
+- Automatic trade-off explanations for all adjustments (volatility vs returns)
+- Allocation history tracking for reviewing past suggestions
+- Clear buttons for allocation and comparison displays
+- Real-time allocation totals with validation (must sum to 100%)
+
+## Running Tests
+```bash
+pytest tests/test_user_story_5.py -v
 ```

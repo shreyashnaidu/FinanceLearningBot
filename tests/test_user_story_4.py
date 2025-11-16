@@ -1,3 +1,10 @@
+"""
+Test cases for User Story 4: Risk Tolerance Confirmation
+Reference: GitHub Issue #4
+
+Run with: pytest tests/test_user_story_4.py -v
+"""
+
 import pytest
 from openai import OpenAI
 import os
