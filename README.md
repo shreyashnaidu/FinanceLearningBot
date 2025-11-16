@@ -136,3 +136,41 @@ python -m unittest tests/test_user_story_3.py -v
 python -m unittest discover -s tests -p "test_*.py" -v
 
 ```
+### User Story 4: Risk Tolerance Configuration 
+**Issue:** [#4](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/4)
+
+**Implementation:**
+- Risk-based investment filtering (Conservative, Moderate, Aggressive)
+- Visual risk tolerance indicators with color coding (🟢🟡🔴)
+- "Get Risk-Based Recommendations" button generates personalized investment options
+- Learning path integration filters tasks by risk appropriateness
+- Dynamic recommendations update when risk tolerance changes
+- All 3 scenarios implemented and tested
+
+**Changes Made:**
+1. `get_investment_recommendations()` - New function to generate risk-appropriate investment guidance
+2. `decompose_goal()` - Updated prompt to filter learning tasks based on risk tolerance
+3. `init_session_state()` - Added `investment_recommendations` to session state
+4. Sidebar - Added visual risk indicators and "Get Risk-Based Recommendations" button
+5. Main content - Added investment recommendations display section with clear functionality
+
+**Test Results:**
+```bash
+pytest tests/test_user_story_4.py -v
+```
+- ✅ Scenario 1: Conservative risk tolerance - recommends bonds, dividend stocks, index funds
+- ✅ Scenario 2: Aggressive risk tolerance - includes growth stocks, sector ETFs, high-volatility assets
+- ✅ Scenario 3: Risk tolerance change (Conservative→Moderate) - updates to balanced growth strategies
+
+**UI Features:**
+- Color-coded risk tolerance indicator (Conservative 🟢, Moderate 🟡, Aggressive 🔴)
+- Risk-appropriate investment recommendations with explanations
+- Dynamic filtering of learning tasks based on risk level
+- Recommendations persist in session until cleared
+- Clear distinction between conservative/moderate/aggressive investment approaches
+
+## Running Tests
+```bash
+# User Story 4: Risk Tolerance
+pytest tests/test_user_story_4.py -v
+```
