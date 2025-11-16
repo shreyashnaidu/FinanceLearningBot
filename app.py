@@ -1,8 +1,11 @@
 import os
 import re
 import json
+import pickle
+import base64
 from typing import TypedDict, List, Dict
 from html import escape
+from datetime import datetime
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -24,9 +27,11 @@ def init_session_state():
     ss.setdefault("allocation_history", [])      # User Story 5
     ss.setdefault("reasoning_answer", "")        # User Story 6
     ss.setdefault("historical_data_display", None)
-    ss.setdefault("backtest_results", None)      # NEW: User Story 9
-    ss.setdefault("strategy_comparison", None)   # NEW: User Story 9
-    ss.setdefault("crisis_backtest", None)       # NEW: User Story 9
+    ss.setdefault("backtest_results", None)      # User Story 9
+    ss.setdefault("strategy_comparison", None)   # User Story 9
+    ss.setdefault("crisis_backtest", None)       # User Story 9
+    ss.setdefault("saved_portfolios", [])  # User Story 10
+    ss.setdefault("load_message", "")      # User Story 10
 
 
 def render_explanation_card(text: str, term: str | None = None):
@@ -730,6 +735,139 @@ Keep under 200 words.
     except Exception as e:
         return f"Unable to analyze crisis performance: {str(e)}"
 
+# Create portfolios directory if it doesn't exist
+PORTFOLIOS_DIR = "saved_portfolios"
+if not os.path.exists(PORTFOLIOS_DIR):
+    os.makedirs(PORTFOLIOS_DIR)
+
+
+def save_portfolio_snapshot(name: str) -> dict:
+    """
+    Save current portfolio and session state to a snapshot.
+    Returns the saved snapshot data.
+    """
+    snapshot = {
+        "name": name,
+        "timestamp": datetime.now().isoformat(),
+        "profile": {
+            "age": st.session_state.get("age", 25),
+            "risk_tolerance": st.session_state.get("risk_tolerance", "Moderate"),
+            "savings": st.session_state.get("savings", 10000),
+            "has_401k": st.session_state.get("has_401k", False),
+            "retirement_balance": st.session_state.get("retirement_balance", 0),
+            "has_stocks": st.session_state.get("has_stocks", False),
+            "stock_value": st.session_state.get("stock_value", 0),
+            "experience": st.session_state.get("experience", "Beginner"),
+            "time_available": st.session_state.get("time_available", "3-5 hours"),
+        },
+        "portfolio": {
+            "stocks": st.session_state.get("stocks", 0.0),
+            "bonds": st.session_state.get("bonds", 0.0),
+            "cash": st.session_state.get("cash", 0.0),
+            "real_estate": st.session_state.get("real_estate", 0.0),
+            "crypto": st.session_state.get("crypto", 0.0),
+            "other": st.session_state.get("other", 0.0),
+        },
+        "goal_state": st.session_state.get("goal_state"),
+        "glossary": st.session_state.get("glossary", []),
+    }
+    
+    # Save to file
+    filename = f"{name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filepath = os.path.join(PORTFOLIOS_DIR, filename)
+    
+    with open(filepath, 'w') as f:
+        json.dump(snapshot, f, indent=2)
+    
+    return snapshot
+
+
+def load_all_saved_portfolios() -> list:
+    """Load all saved portfolios from disk"""
+    portfolios = []
+    
+    if not os.path.exists(PORTFOLIOS_DIR):
+        return portfolios
+    
+    for filename in os.listdir(PORTFOLIOS_DIR):
+        if filename.endswith('.json'):
+            filepath = os.path.join(PORTFOLIOS_DIR, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    snapshot = json.load(f)
+                    snapshot['filename'] = filename  # Store filename for deletion
+                    portfolios.append(snapshot)
+            except Exception as e:
+                print(f"Error loading {filename}: {e}")
+    
+    # Sort by timestamp (newest first)
+    portfolios.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    return portfolios
+
+
+def delete_portfolio_snapshot(filename: str) -> None:
+    """Delete a saved portfolio file"""
+    filepath = os.path.join(PORTFOLIOS_DIR, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+
+def load_portfolio_snapshot(snapshot: dict) -> None:
+    """
+    Load a portfolio snapshot into current session state.
+    Must be called BEFORE widgets are created.
+    """
+    # Store in a temp variable that will be applied on next rerun
+    st.session_state["_pending_load"] = snapshot
+
+def apply_pending_load():
+    """Apply pending portfolio load if exists"""
+    if "_pending_load" not in st.session_state:
+        return
+    
+    snapshot = st.session_state["_pending_load"]
+    
+    # Load profile
+    profile = snapshot.get("profile", {})
+    st.session_state["age"] = profile.get("age", 25)
+    st.session_state["risk_tolerance"] = profile.get("risk_tolerance", "Moderate")
+    st.session_state["savings"] = profile.get("savings", 10000)
+    st.session_state["has_401k"] = profile.get("has_401k", False)
+    st.session_state["retirement_balance"] = profile.get("retirement_balance", 0)
+    st.session_state["has_stocks"] = profile.get("has_stocks", False)
+    st.session_state["stock_value"] = profile.get("stock_value", 0)
+    st.session_state["experience"] = profile.get("experience", "Beginner")
+    st.session_state["time_available"] = profile.get("time_available", "3-5 hours")
+    
+    # Load portfolio allocation
+    portfolio = snapshot.get("portfolio", {})
+    st.session_state["stocks"] = portfolio.get("stocks", 0.0)
+    st.session_state["bonds"] = portfolio.get("bonds", 0.0)
+    st.session_state["cash"] = portfolio.get("cash", 0.0)
+    st.session_state["real_estate"] = portfolio.get("real_estate", 0.0)
+    st.session_state["crypto"] = portfolio.get("crypto", 0.0)
+    st.session_state["other"] = portfolio.get("other", 0.0)
+    
+    # Load goal state and glossary
+    st.session_state["goal_state"] = snapshot.get("goal_state")
+    st.session_state["glossary"] = snapshot.get("glossary", [])
+    
+    # Clear pending load and set message
+    del st.session_state["_pending_load"]
+    st.session_state.load_message = f"✅ Loaded '{snapshot['name']}'"
+
+def serialize_snapshot(snapshot: dict) -> str:
+    """Serialize snapshot to base64 string for download"""
+    # Remove filename key if present (not needed for export)
+    export_snapshot = {k: v for k, v in snapshot.items() if k != 'filename'}
+    json_str = json.dumps(export_snapshot, indent=2)
+    return base64.b64encode(json_str.encode()).decode()
+
+
+def deserialize_snapshot(serialized: str) -> dict:
+    """Deserialize snapshot from base64 string"""
+    json_str = base64.b64decode(serialized.encode()).decode()
+    return json.loads(json_str)
 
 # ============================
 # User Story 7 – Reset Memory
@@ -921,9 +1059,15 @@ def main():
         layout="wide",
     )
     init_session_state()
+    apply_pending_load()
 
     st.title("💰 Finance Learning Bot - AI Goal Mentor")
     st.markdown("### Your Personal Financial Education Assistant")
+
+    # Display load/save messages
+    if st.session_state.get("load_message"):
+        st.info(st.session_state.load_message)
+        st.session_state.load_message = ""
 
     # -------- Sidebar: Profile + Portfolio + Glossary --------
     with st.sidebar:
@@ -1167,6 +1311,112 @@ def main():
 
             st.success("✅ Portfolio analysis complete!")
             st.rerun()
+
+        st.markdown("---")
+        st.header("💾 Save/Load Portfolio")
+        st.markdown("*Save your portfolio and progress*")
+        
+        # Save Portfolio Section
+        st.markdown("**Save Current Session:**")
+        snapshot_name = st.text_input(
+            "Portfolio Name",
+            placeholder="e.g., 'My Conservative Portfolio' or 'Retirement Plan 2024'",
+            key="snapshot_name_input"
+        )
+        
+        if st.button("💾 Save Portfolio", use_container_width=True):
+            if snapshot_name.strip():
+                with st.spinner("Saving portfolio..."):
+                    snapshot = save_portfolio_snapshot(snapshot_name.strip())
+                st.success(f"✅ Saved '{snapshot_name}'!")
+                st.rerun()
+            else:
+                st.warning("Please enter a name for your portfolio")
+        
+        # Load Portfolio Section - Load from disk each time
+        saved_portfolios = load_all_saved_portfolios()
+        
+        if saved_portfolios:
+            st.markdown("---")
+            st.markdown("**Load Saved Portfolio:**")
+            
+            # Create a list of portfolio names with timestamps
+            portfolio_options = [
+                f"{p['name']} - {datetime.fromisoformat(p['timestamp']).strftime('%Y-%m-%d %H:%M')}"
+                for p in saved_portfolios
+            ]
+            
+            selected_idx = st.selectbox(
+                "Select Portfolio",
+                options=range(len(portfolio_options)),
+                format_func=lambda x: portfolio_options[x],
+                key="portfolio_select"
+            )
+            
+            col_load, col_delete = st.columns(2)
+            
+            with col_load:
+                if st.button("📂 Load", use_container_width=True):
+                    snapshot = saved_portfolios[selected_idx]
+                    load_portfolio_snapshot(snapshot)
+                    # Message will be set by apply_pending_load()
+                    st.rerun()
+            
+            with col_delete:
+                if st.button("🗑️ Delete", use_container_width=True):
+                    snapshot_to_delete = saved_portfolios[selected_idx]
+                    deleted_name = snapshot_to_delete['name']
+                    delete_portfolio_snapshot(snapshot_to_delete['filename'])
+                    st.session_state.load_message = f"🗑️ Deleted '{deleted_name}'"
+                    st.rerun()
+            
+            # Export/Import Section
+            st.markdown("---")
+            st.markdown("**Export/Import:**")
+            
+            # Export selected portfolio
+            snapshot_to_export = saved_portfolios[selected_idx]
+            serialized = serialize_snapshot(snapshot_to_export)
+            
+            st.download_button(
+                label="⬇️ Export Portfolio",
+                data=serialized,
+                file_name=f"{snapshot_to_export['name'].replace(' ', '_')}.portfolio",
+                mime="text/plain",
+                use_container_width=True
+            )
+            
+            # Import portfolio
+            uploaded_file = st.file_uploader(
+                "Import Portfolio File",
+                type=["portfolio"],
+                key="portfolio_import"
+            )
+            
+            if uploaded_file is not None:
+                try:
+                    serialized_data = uploaded_file.read().decode()
+                    imported_snapshot = deserialize_snapshot(serialized_data)
+                    
+                    # Save imported portfolio
+                    imported_name = imported_snapshot.get('name', 'Imported Portfolio')
+                    
+                    # Update timestamp
+                    imported_snapshot['timestamp'] = datetime.now().isoformat()
+                    
+                    # Save to disk
+                    filename = f"{imported_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    filepath = os.path.join(PORTFOLIOS_DIR, filename)
+                    
+                    with open(filepath, 'w') as f:
+                        json.dump(imported_snapshot, f, indent=2)
+                    
+                    st.success(f"✅ Imported '{imported_name}'!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Failed to import: {str(e)}")
+        else:
+            st.info("No saved portfolios yet. Save your current session above!")
 
         st.markdown("---")
         st.markdown("### About")
