@@ -16,6 +16,7 @@ def init_session_state():
     ss.setdefault("explanation", "")
     ss.setdefault("glossary", [])
     ss.setdefault("portfolio_analysis_only", None)
+    ss.setdefault("investment_recommendations", None) 
 
 def render_explanation_card(text: str, term: str | None = None):
     safe = escape(text).replace("\n", "<br>")
@@ -67,6 +68,64 @@ Explain this finance concept simply for a beginner:
     )
     return resp.choices[0].message.content.strip()
 
+def get_investment_recommendations(risk_tolerance: str, goal: str = "") -> str:
+    """Get risk-appropriate investment recommendations"""
+    
+    risk_profiles = {
+        "Conservative": {
+            "focus": "capital preservation and steady income",
+            "recommended": "government bonds, high-grade corporate bonds, dividend-paying blue-chip stocks, index funds (S&P 500, total market), money market funds, and certificates of deposit (CDs)",
+            "avoid": "individual growth stocks, cryptocurrency, options/derivatives, sector-specific ETFs, and high-volatility assets",
+            "note": "While higher-risk options exist (like growth stocks and crypto), they don't align with your conservative approach and could jeopardize your capital."
+        },
+        "Moderate": {
+            "focus": "balanced growth with moderate risk",
+            "recommended": "diversified index funds, balanced mutual funds (60/40 stocks/bonds), dividend growth stocks, real estate investment trusts (REITs), target-date retirement funds, and a mix of growth and value stocks",
+            "avoid": "highly speculative assets, leveraged ETFs, penny stocks, and concentrated sector bets",
+            "note": "You can consider some growth opportunities while maintaining a defensive position with bonds and stable dividend stocks."
+        },
+        "Aggressive": {
+            "focus": "maximum growth potential accepting higher volatility",
+            "recommended": "growth stocks (especially in technology and emerging sectors), sector-specific ETFs, small-cap and mid-cap stocks, international emerging markets, some cryptocurrency exposure (5-10% max), and actively managed growth funds",
+            "avoid": "nothing is off limits, but maintain some diversification",
+            "note": "With aggressive tolerance, you can pursue high-growth opportunities, but remember to diversify across sectors and asset classes to manage downside risk."
+        }
+    }
+    
+    profile = risk_profiles.get(risk_tolerance, risk_profiles["Moderate"])
+    
+    prompt = f"""You are a financial advisor providing investment recommendations.
+
+Risk Tolerance: {risk_tolerance}
+Goal: {goal if goal else "general investment education"}
+
+Based on a {risk_tolerance} risk tolerance (focus: {profile['focus']}), provide a brief educational overview of appropriate investment options.
+
+RECOMMENDED for {risk_tolerance} investors: {profile['recommended']}
+
+AVOID or minimize: {profile['avoid']}
+
+IMPORTANT NOTE: {profile['note']}
+
+Provide:
+1. A brief explanation of why these options match this risk level (2-3 sentences)
+2. List 3-4 specific investment types to learn about
+3. A cautionary note about risk-inappropriate options
+
+Keep response under 200 words. Be educational and encouraging.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=400
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error getting recommendations: {str(e)}"
+
 # ============= LangGraph Types & Nodes =============
 
 class GoalState(TypedDict):
@@ -96,6 +155,12 @@ User Financial Situation:
 
 User Experience Level: {user_info.get('experience', 'beginner')}
 Available Time per Week: {user_info.get('time', 'not specified')}
+
+IMPORTANT - Risk Tolerance Filtering:
+- Risk Tolerance: {user_info.get('risk_tolerance', 'Moderate')}
+- If Conservative: Focus learning on bonds, dividend stocks, and index funds. Mention but de-emphasize high-risk options.
+- If Moderate: Include balanced mix of growth and income investments.
+- If Aggressive: Include growth stocks, sector-specific investments, and higher-volatility assets in learning path.
 
 Create subtasks that are:
 - Specific and measurable
@@ -213,17 +278,53 @@ def main():
         st.header("📋 Your Profile")
 
         # Financial Situation inputs
+        experience = st.selectbox("Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"])
+        time_available = st.selectbox("Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"])
         age = st.number_input("Age", min_value=18, max_value=100, value=25)
-        risk_tolerance = st.selectbox("Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1)
         savings = st.number_input("Current Savings ($)", min_value=0, value=10000, step=1000)
         has_401k = st.checkbox("I have a 401(k)", value=False)
         retirement_balance = st.number_input("401(k) Balance ($)", min_value=0, value=0, step=1000) if has_401k else 0
         has_stocks = st.checkbox("I own stocks", value=False)
         stock_value = st.number_input("Stock Portfolio Value ($)", min_value=0, value=0, step=1000) if has_stocks else 0
 
+        risk_tolerance = st.selectbox("Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1)
+        # Visual indicator for risk tolerance
+        risk_colors = {
+            "Conservative": "🟢",
+            "Moderate": "🟡",
+            "Aggressive": "🔴"
+        }
+        
+        risk_descriptions = {
+            "Conservative": "Focus: Capital preservation, steady income",
+            "Moderate": "Focus: Balanced growth with moderate risk",
+            "Aggressive": "Focus: Maximum growth, higher volatility"
+        }
+        
+        st.info(f"{risk_colors.get(risk_tolerance, '🟡')} **{risk_tolerance}**: {risk_descriptions.get(risk_tolerance, '')}")
+        
         st.markdown("---")
-        experience = st.selectbox("Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"])
-        time_available = st.selectbox("Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"])
+        
+        # Investment Recommendations Section
+        st.header("💡 Investment Recommendations")
+        
+        if st.button(
+            "📋 Get Risk-Based Recommendations",
+            type="secondary",
+            use_container_width=True,
+            help=f"Get investment options suitable for {risk_tolerance} risk tolerance"
+        ):
+            with st.spinner("Generating recommendations..."):
+                recommendations = get_investment_recommendations(risk_tolerance, "")
+                
+                # Store in session state
+                st.session_state['investment_recommendations'] = {
+                    'risk_tolerance': risk_tolerance,
+                    'recommendations': recommendations
+                }
+            
+            st.success("✅ Recommendations generated!")
+            st.rerun()
 
         st.markdown("---")
         st.header("📊 Portfolio Analysis")
@@ -307,6 +408,21 @@ def main():
                     file_name="glossary.txt",
                     mime="text/plain"
                 )
+
+    # Display Investment Recommendations (if exists)
+    if 'investment_recommendations' in st.session_state and st.session_state.investment_recommendations:
+        rec_data = st.session_state.investment_recommendations
+        
+        st.subheader(f"💡 Investment Recommendations ({rec_data['risk_tolerance']} Risk)")
+        
+        st.markdown(rec_data['recommendations'])
+        
+        # Clear button
+        if st.button("🗑️ Clear Recommendations"):
+            st.session_state.investment_recommendations = None
+            st.rerun()
+        
+        st.markdown("---")            
 
     # -------- Portfolio-only Analysis (center) --------
     if st.session_state.portfolio_analysis_only:
