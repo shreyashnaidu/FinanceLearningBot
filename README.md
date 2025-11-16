@@ -259,3 +259,49 @@ python -m unittest tests/test_user_story_6.py -v
 - Allocation history tracking for reviewing past suggestions
 - Fully integrated with existing sidebar + main content workflow
 - Real-time allocation totals with validation (must sum to 100%)
+
+## Running Tests
+```bash
+pytest tests/test_user_story_6.py -v
+```
+
+### User Story 7: Reset Memory & Start Fresh  
+**Issue:** [#7](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/7)
+
+**Implementation:**
+- Added full session reset system allowing users to clear all stored financial data, reasoning, and recommendations  
+- Supports two reset modes:
+  - **Reset Memory:** Clears bot-generated outputs while keeping UI inputs
+  - **Start New Session:** Completely resets the user's financial profile and conversation state
+- Ensures no previous context influences future recommendations or explanations  
+- Designed to prevent contamination from earlier incorrect or experimental inputs  
+- All 3 scenarios implemented and tested
+
+**Changes Made:**
+1. `reset_all_memory()` — clears learning paths, portfolio analysis, recommendations, reasoning, allocations, and glossary  
+2. `reset_profile_and_memory()` — full wipe of user profile state (age, risk tolerance, savings, 401k, stocks, experience, time availability)  
+3. Updated main UI to include both buttons with confirmation prompts (Reset Memory + Start New Session)  
+4. Session state cleanup redesigned to ensure no stale keys remain after a reset  
+5. Improved initialization logic to safely repopulate defaults after full reset  
+
+**Test Results:**
+```bash
+python -m unittest tests/test_user_story_7.py -v
+```
+✅ Scenario 1: Reset Memory clears all stored bot outputs
+✅ Scenario 2: Start New Session resets all profile fields to defaults
+✅ Scenario 3: Incorrect data is successfully removed, ensuring clean re-entry)
+
+**UI Features:**
+- “🧹 Reset Memory” button clears recommendations, reasoning, allocations, glossary, and portfolio analysis
+- “🔄 Start New Session” fully resets all user profile fields plus memory
+- Clean confirmation messages guiding users through reset actions
+- Ensures recommendations never reference stale or incorrect data
+- Safe, isolated session state preventing data leakage between sessions
+- Integrated seamlessly into sidebar profile section for quick access
+- Real-time allocation totals with validation (must sum to 100%)
+
+## Running Tests
+```bash
+pytest tests/test_user_story_7.py -v
+```
