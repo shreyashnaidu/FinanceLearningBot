@@ -1071,352 +1071,301 @@ def main():
     # -------- Sidebar: Profile + Portfolio + Glossary --------
     with st.sidebar:
         st.header("📋 Your Profile")
-
-        experience = st.selectbox(
-            "Financial Knowledge Level", ["Beginner", "Intermediate", "Advanced"]
-        )
-        time_available = st.selectbox(
-            "Time Available per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"]
-        )
-        age = st.number_input("Age", min_value=18, max_value=100, value=25)
-        savings = st.number_input(
-            "Current Savings ($)", min_value=0, value=10000, step=1000
-        )
-        has_401k = st.checkbox("I have a 401(k)", value=False)
-        retirement_balance = (
-            st.number_input(
-                "401(k) Balance ($)", min_value=0, value=0, step=1000
-            )
-            if has_401k
-            else 0
-        )
-        has_stocks = st.checkbox("I own stocks", value=False)
-        stock_value = (
-            st.number_input(
-                "Stock Portfolio Value ($)", min_value=0, value=0, step=1000
-            )
-            if has_stocks
-            else 0
-        )
-
+        
+        # ===== CORE PROFILE (Always Visible) =====
+        age = st.number_input("Age", min_value=18, max_value=100, value=25, key="age")
+        
         risk_tolerance = st.selectbox(
-            "Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1
+            "Risk Tolerance", ["Conservative", "Moderate", "Aggressive"], index=1, key="risk_tolerance"
         )
-
+        
         risk_colors = {
             "Conservative": "🟢",
             "Moderate": "🟡",
             "Aggressive": "🔴",
         }
-
+        
         risk_descriptions = {
-            "Conservative": "Focus: Capital preservation, steady income",
-            "Moderate": "Focus: Balanced growth with moderate risk",
-            "Aggressive": "Focus: Maximum growth, higher volatility",
+            "Conservative": "Capital preservation, steady income",
+            "Moderate": "Balanced growth with moderate risk",
+            "Aggressive": "Maximum growth, higher volatility",
         }
-
-        st.info(
-            f"{risk_colors.get(risk_tolerance, '🟡')} **{risk_tolerance}**: {risk_descriptions.get(risk_tolerance, '')}"
-        )
-
-        st.markdown("---")
         
-
-        # Investment Recommendations Section
-        st.header("💡 Investment Recommendations")
-
-        if st.button(
-            "📋 Get Risk-Based Recommendations",
-            type="secondary",
-            use_container_width=True,
-            help=f"Get investment options suitable for {risk_tolerance} risk tolerance",
-        ):
-            with st.spinner("Generating recommendations..."):
-                recommendations = get_investment_recommendations(risk_tolerance, "")
-
-                st.session_state["investment_recommendations"] = {
-                    "risk_tolerance": risk_tolerance,
-                    "recommendations": recommendations,
-                }
-
-            st.success("✅ Recommendations generated!")
-            st.rerun()
-
-        st.markdown("---")
-
-        # Portfolio Allocation Suggestions (User Story 5)
-        st.header("📈 Portfolio Allocation")
-
-        if st.button(
-            "🎯 Suggest Allocation",
-            type="secondary",
-            use_container_width=True,
-            help=f"Get {risk_tolerance} portfolio allocation suggestion",
-        ):
-            with st.spinner(f"Generating {risk_tolerance} allocation..."):
-                allocation = suggest_portfolio_allocation(risk_tolerance)
-
-                st.session_state["suggested_allocation"] = {
-                    "risk_tolerance": risk_tolerance,
-                    "allocation": allocation,
-                    "timestamp": "current",
-                }
-
-                st.session_state.allocation_history.append(
-                    {
-                        "label": f"{risk_tolerance} Allocation",
-                        "allocation": allocation,
-                    }
+        st.caption(
+            f"{risk_colors.get(risk_tolerance, '🟡')} {risk_descriptions.get(risk_tolerance, '')}"
+        )
+        
+        # ===== ADDITIONAL PROFILE DETAILS (Expandable) =====
+        with st.expander("💼 Additional Profile Details", expanded=False):
+            experience = st.selectbox(
+                "Financial Knowledge", ["Beginner", "Intermediate", "Advanced"], key="experience"
+            )
+            time_available = st.selectbox(
+                "Time per Week", ["1-2 hours", "3-5 hours", "5-10 hours", "10+ hours"], key="time_available"
+            )
+            savings = st.number_input(
+                "Current Savings ($)", min_value=0, value=10000, step=1000, key="savings"
+            )
+            has_401k = st.checkbox("I have a 401(k)", value=False, key="has_401k")
+            retirement_balance = (
+                st.number_input(
+                    "401(k) Balance ($)", min_value=0, value=0, step=1000, key="retirement_balance"
                 )
-
-            st.success("✅ Allocation generated!")
-            st.rerun()
-        st.markdown("---")
-        st.subheader("🧹 Reset Options")
-        # Reset memory only
-        if st.button("🧹 Reset Memory", use_container_width=True):
-            reset_all_memory()
-            st.success("Memory cleared! Your recommendations and history have been reset.")
-            st.rerun()
-        # Full session reset
-        if st.button("🔄 Start New Session", use_container_width=True):
-            reset_profile_and_memory()
-            st.success("New session started! All profile data cleared.")
-            st.rerun()
-
-
-        # User feedback for adjustment (User Story 5)
-        if st.session_state.get("suggested_allocation"):
-            st.markdown("**Adjust Allocation:**")
-            user_adjustment = st.text_input(
-                "Feedback",
-                placeholder="e.g., 'I want more stocks' or 'Less bonds'",
-                key="user_adjustment_input",
+                if has_401k
+                else 0
             )
-
-            if st.button("🔧 Adjust", use_container_width=True):
-                if user_adjustment.strip():
-                    current_alloc = st.session_state.suggested_allocation["allocation"]
-
-                    with st.spinner("Adjusting allocation..."):
-                        new_alloc, explanation = adjust_allocation_by_feedback(
-                            current_alloc, user_adjustment
-                        )
-
-                        st.session_state.suggested_allocation = {
-                            "risk_tolerance": risk_tolerance,
-                            "allocation": new_alloc,
-                            "adjustment_explanation": explanation,
-                            "timestamp": "adjusted",
-                        }
-
-                    st.success("✅ Adjusted!")
-                    st.rerun()
-
-        st.markdown("---")
-        st.header("📊 Portfolio Analysis")
-        st.markdown("*Get personalized portfolio guidance*")
-
-        st.markdown("**Current Asset Allocation (%)**")
-        stocks = st.number_input(
-            "Stocks", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="stocks"
-        )
-        bonds = st.number_input(
-            "Bonds", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="bonds"
-        )
-        cash = st.number_input(
-            "Cash/Savings",
-            min_value=0.0,
-            max_value=100.0,
-            value=0.0,
-            step=5.0,
-            key="cash",
-        )
-        real_estate = st.number_input(
-            "Real Estate",
-            min_value=0.0,
-            max_value=100.0,
-            value=0.0,
-            step=5.0,
-            key="real_estate",
-        )
-        crypto = st.number_input(
-            "Cryptocurrency",
-            min_value=0.0,
-            max_value=100.0,
-            value=0.0,
-            step=5.0,
-            key="crypto",
-        )
-        other = st.number_input(
-            "Other", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="other"
-        )
-
-        total_allocation = stocks + bonds + cash + real_estate + crypto + other
-        if total_allocation == 100:
-            st.success(f"✅ Total Allocation: {total_allocation}%")
-        elif total_allocation > 0:
-            st.warning(
-                f"⚠️ Total Allocation: {total_allocation}% (Must be 100%)"
+            has_stocks = st.checkbox("I own stocks", value=False, key="has_stocks")
+            stock_value = (
+                st.number_input(
+                    "Stock Portfolio Value ($)", min_value=0, value=0, step=1000, key="stock_value"
+                )
+                if has_stocks
+                else 0
             )
-        else:
-            st.info("💡 Total Allocation: 0% (Enter your portfolio)")
-
-        analyze_enabled = total_allocation == 100.0
-        if st.button(
-            "🔍 Analyze Portfolio",
-            type="primary",
-            disabled=not analyze_enabled,
-            help=(
-                "Total allocation must equal 100% to analyze"
-                if not analyze_enabled
-                else "Click to analyze your portfolio"
-            ),
-            use_container_width=True,
-        ):
-            portfolio: Dict[str, float] = {}
-            if stocks > 0:
-                portfolio["Stocks"] = stocks
-            if bonds > 0:
-                portfolio["Bonds"] = bonds
-            if cash > 0:
-                portfolio["Cash"] = cash
-            if real_estate > 0:
-                portfolio["Real Estate"] = real_estate
-            if crypto > 0:
-                portfolio["Cryptocurrency"] = crypto
-            if other > 0:
-                portfolio["Other"] = other
-
-            with st.spinner("Analyzing your portfolio..."):
-                portfolio_state: GoalState = {
-                    "goal": "",
-                    "subtasks": [],
-                    "completed_tasks": [],
-                    "user_info": {
-                        "experience": experience.lower(),
-                        "time": time_available,
-                    },
-                    "messages": [],
-                    "portfolio": portfolio,
-                    "portfolio_analysis": "",
-                }
-                analyzed_state = analyze_portfolio(portfolio_state)
-
-                st.session_state.portfolio_analysis_only = {
-                    "portfolio": portfolio,
-                    "analysis": analyzed_state.get("portfolio_analysis", ""),
-                }
-
-            st.success("✅ Portfolio analysis complete!")
-            st.rerun()
-
+        
         st.markdown("---")
-        st.header("💾 Save/Load Portfolio")
-        st.markdown("*Save your portfolio and progress*")
         
-        # Save Portfolio Section
-        st.markdown("**Save Current Session:**")
-        snapshot_name = st.text_input(
-            "Portfolio Name",
-            placeholder="e.g., 'My Conservative Portfolio' or 'Retirement Plan 2024'",
-            key="snapshot_name_input"
-        )
-        
-        if st.button("💾 Save Portfolio", use_container_width=True):
-            if snapshot_name.strip():
-                with st.spinner("Saving portfolio..."):
-                    snapshot = save_portfolio_snapshot(snapshot_name.strip())
-                st.success(f"✅ Saved '{snapshot_name}'!")
+        # ===== INVESTMENT TOOLS (Expandable) =====
+        with st.expander("💡 Investment Tools", expanded=False):
+            st.markdown("**Get Recommendations**")
+            if st.button(
+                "📋 Get Risk-Based Recommendations",
+                type="secondary",
+                use_container_width=True,
+                help=f"Get investment options for {risk_tolerance} risk",
+            ):
+                with st.spinner("Generating recommendations..."):
+                    recommendations = get_investment_recommendations(risk_tolerance, "")
+                    st.session_state["investment_recommendations"] = {
+                        "risk_tolerance": risk_tolerance,
+                        "recommendations": recommendations,
+                    }
+                st.success("✅ Recommendations generated!")
                 st.rerun()
+            
+            st.markdown("**Portfolio Allocation**")
+            if st.button(
+                "🎯 Suggest Allocation",
+                type="secondary",
+                use_container_width=True,
+                help=f"Get {risk_tolerance} allocation suggestion",
+            ):
+                with st.spinner(f"Generating {risk_tolerance} allocation..."):
+                    allocation = suggest_portfolio_allocation(risk_tolerance)
+                    st.session_state["suggested_allocation"] = {
+                        "risk_tolerance": risk_tolerance,
+                        "allocation": allocation,
+                        "timestamp": "current",
+                    }
+                    st.session_state.allocation_history.append(
+                        {
+                            "label": f"{risk_tolerance} Allocation",
+                            "allocation": allocation,
+                        }
+                    )
+                st.success("✅ Allocation generated!")
+                st.rerun()
+            
+            # User feedback for adjustment
+            if st.session_state.get("suggested_allocation"):
+                st.markdown("**Adjust Allocation**")
+                user_adjustment = st.text_input(
+                    "Feedback",
+                    placeholder="e.g., 'I want more stocks'",
+                    key="user_adjustment_input",
+                )
+                
+                if st.button("🔧 Adjust", use_container_width=True):
+                    if user_adjustment.strip():
+                        current_alloc = st.session_state.suggested_allocation["allocation"]
+                        with st.spinner("Adjusting allocation..."):
+                            new_alloc, explanation = adjust_allocation_by_feedback(
+                                current_alloc, user_adjustment
+                            )
+                            st.session_state.suggested_allocation = {
+                                "risk_tolerance": risk_tolerance,
+                                "allocation": new_alloc,
+                                "adjustment_explanation": explanation,
+                                "timestamp": "adjusted",
+                            }
+                        st.success("✅ Adjusted!")
+                        st.rerun()
+        
+        # ===== PORTFOLIO ANALYSIS (Expandable) =====
+        with st.expander("📊 Portfolio Analysis", expanded=False):
+            st.caption("Enter your current asset allocation")
+            
+            stocks = st.number_input(
+                "Stocks", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="stocks"
+            )
+            bonds = st.number_input(
+                "Bonds", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="bonds"
+            )
+            cash = st.number_input(
+                "Cash/Savings", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="cash"
+            )
+            real_estate = st.number_input(
+                "Real Estate", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="real_estate"
+            )
+            crypto = st.number_input(
+                "Cryptocurrency", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="crypto"
+            )
+            other = st.number_input(
+                "Other", min_value=0.0, max_value=100.0, value=0.0, step=5.0, key="other"
+            )
+            
+            total_allocation = stocks + bonds + cash + real_estate + crypto + other
+            if total_allocation == 100:
+                st.success(f"✅ Total: {total_allocation}%")
+            elif total_allocation > 0:
+                st.warning(f"⚠️ Total: {total_allocation}% (need 100%)")
             else:
-                st.warning("Please enter a name for your portfolio")
+                st.info("💡 Enter your portfolio allocation")
+            
+            analyze_enabled = total_allocation == 100.0
+            if st.button(
+                "🔍 Analyze Portfolio",
+                type="primary",
+                disabled=not analyze_enabled,
+                help="Total must equal 100% to analyze" if not analyze_enabled else "Analyze your portfolio",
+                use_container_width=True,
+            ):
+                portfolio: Dict[str, float] = {}
+                if stocks > 0:
+                    portfolio["Stocks"] = stocks
+                if bonds > 0:
+                    portfolio["Bonds"] = bonds
+                if cash > 0:
+                    portfolio["Cash"] = cash
+                if real_estate > 0:
+                    portfolio["Real Estate"] = real_estate
+                if crypto > 0:
+                    portfolio["Cryptocurrency"] = crypto
+                if other > 0:
+                    portfolio["Other"] = other
+                
+                with st.spinner("Analyzing your portfolio..."):
+                    portfolio_state: GoalState = {
+                        "goal": "",
+                        "subtasks": [],
+                        "completed_tasks": [],
+                        "user_info": {
+                            "experience": experience.lower(),
+                            "time": time_available,
+                        },
+                        "messages": [],
+                        "portfolio": portfolio,
+                        "portfolio_analysis": "",
+                    }
+                    analyzed_state = analyze_portfolio(portfolio_state)
+                    st.session_state.portfolio_analysis_only = {
+                        "portfolio": portfolio,
+                        "analysis": analyzed_state.get("portfolio_analysis", ""),
+                    }
+                st.success("✅ Analysis complete!")
+                st.rerun()
         
-        # Load Portfolio Section - Load from disk each time
-        saved_portfolios = load_all_saved_portfolios()
+        # ===== SAVE/LOAD PORTFOLIO (Expandable) =====
+        with st.expander("💾 Save/Load Portfolio", expanded=False):
+            st.markdown("**Save Current Session**")
+            snapshot_name = st.text_input(
+                "Portfolio Name",
+                placeholder="e.g., 'My Conservative Portfolio'",
+                key="snapshot_name_input"
+            )
+            
+            if st.button("💾 Save Portfolio", use_container_width=True):
+                if snapshot_name.strip():
+                    with st.spinner("Saving portfolio..."):
+                        snapshot = save_portfolio_snapshot(snapshot_name.strip())
+                    st.success(f"✅ Saved '{snapshot_name}'!")
+                    st.rerun()
+                else:
+                    st.warning("Please enter a name")
+            
+            # Load Portfolio Section
+            saved_portfolios = load_all_saved_portfolios()
+            
+            if saved_portfolios:
+                st.markdown("**Load Saved Portfolio**")
+                
+                portfolio_options = [
+                    f"{p['name']} - {datetime.fromisoformat(p['timestamp']).strftime('%Y-%m-%d %H:%M')}"
+                    for p in saved_portfolios
+                ]
+                
+                selected_idx = st.selectbox(
+                    "Select Portfolio",
+                    options=range(len(portfolio_options)),
+                    format_func=lambda x: portfolio_options[x],
+                    key="portfolio_select"
+                )
+                
+                col_load, col_delete = st.columns(2)
+                
+                with col_load:
+                    if st.button("📂 Load", use_container_width=True):
+                        snapshot = saved_portfolios[selected_idx]
+                        load_portfolio_snapshot(snapshot)
+                        st.rerun()
+                
+                with col_delete:
+                    if st.button("🗑️ Delete", use_container_width=True):
+                        snapshot_to_delete = saved_portfolios[selected_idx]
+                        deleted_name = snapshot_to_delete['name']
+                        delete_portfolio_snapshot(snapshot_to_delete['filename'])
+                        st.session_state.load_message = f"🗑️ Deleted '{deleted_name}'"
+                        st.rerun()
+                
+                st.markdown("**Export/Import**")
+                
+                snapshot_to_export = saved_portfolios[selected_idx]
+                serialized = serialize_snapshot(snapshot_to_export)
+                
+                st.download_button(
+                    label="⬇️ Export",
+                    data=serialized,
+                    file_name=f"{snapshot_to_export['name'].replace(' ', '_')}.portfolio",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+                
+                uploaded_file = st.file_uploader(
+                    "Import Portfolio File",
+                    type=["portfolio"],
+                    key="portfolio_import"
+                )
+                
+                if uploaded_file is not None:
+                    try:
+                        serialized_data = uploaded_file.read().decode()
+                        imported_snapshot = deserialize_snapshot(serialized_data)
+                        imported_name = imported_snapshot.get('name', 'Imported Portfolio')
+                        imported_snapshot['timestamp'] = datetime.now().isoformat()
+                        filename = f"{imported_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                        filepath = os.path.join(PORTFOLIOS_DIR, filename)
+                        with open(filepath, 'w') as f:
+                            json.dump(imported_snapshot, f, indent=2)
+                        st.success(f"✅ Imported '{imported_name}'!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Failed to import: {str(e)}")
+            else:
+                st.info("No saved portfolios yet")
         
-        if saved_portfolios:
-            st.markdown("---")
-            st.markdown("**Load Saved Portfolio:**")
+        # ===== RESET OPTIONS (Expandable) =====
+        with st.expander("🧹 Reset Options", expanded=False):
+            if st.button("🧹 Reset Memory", use_container_width=True):
+                reset_all_memory()
+                st.success("Memory cleared!")
+                st.rerun()
             
-            # Create a list of portfolio names with timestamps
-            portfolio_options = [
-                f"{p['name']} - {datetime.fromisoformat(p['timestamp']).strftime('%Y-%m-%d %H:%M')}"
-                for p in saved_portfolios
-            ]
-            
-            selected_idx = st.selectbox(
-                "Select Portfolio",
-                options=range(len(portfolio_options)),
-                format_func=lambda x: portfolio_options[x],
-                key="portfolio_select"
-            )
-            
-            col_load, col_delete = st.columns(2)
-            
-            with col_load:
-                if st.button("📂 Load", use_container_width=True):
-                    snapshot = saved_portfolios[selected_idx]
-                    load_portfolio_snapshot(snapshot)
-                    # Message will be set by apply_pending_load()
-                    st.rerun()
-            
-            with col_delete:
-                if st.button("🗑️ Delete", use_container_width=True):
-                    snapshot_to_delete = saved_portfolios[selected_idx]
-                    deleted_name = snapshot_to_delete['name']
-                    delete_portfolio_snapshot(snapshot_to_delete['filename'])
-                    st.session_state.load_message = f"🗑️ Deleted '{deleted_name}'"
-                    st.rerun()
-            
-            # Export/Import Section
-            st.markdown("---")
-            st.markdown("**Export/Import:**")
-            
-            # Export selected portfolio
-            snapshot_to_export = saved_portfolios[selected_idx]
-            serialized = serialize_snapshot(snapshot_to_export)
-            
-            st.download_button(
-                label="⬇️ Export Portfolio",
-                data=serialized,
-                file_name=f"{snapshot_to_export['name'].replace(' ', '_')}.portfolio",
-                mime="text/plain",
-                use_container_width=True
-            )
-            
-            # Import portfolio
-            uploaded_file = st.file_uploader(
-                "Import Portfolio File",
-                type=["portfolio"],
-                key="portfolio_import"
-            )
-            
-            if uploaded_file is not None:
-                try:
-                    serialized_data = uploaded_file.read().decode()
-                    imported_snapshot = deserialize_snapshot(serialized_data)
-                    
-                    # Save imported portfolio
-                    imported_name = imported_snapshot.get('name', 'Imported Portfolio')
-                    
-                    # Update timestamp
-                    imported_snapshot['timestamp'] = datetime.now().isoformat()
-                    
-                    # Save to disk
-                    filename = f"{imported_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                    filepath = os.path.join(PORTFOLIOS_DIR, filename)
-                    
-                    with open(filepath, 'w') as f:
-                        json.dump(imported_snapshot, f, indent=2)
-                    
-                    st.success(f"✅ Imported '{imported_name}'!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Failed to import: {str(e)}")
-        else:
-            st.info("No saved portfolios yet. Save your current session above!")
+            if st.button("🔄 Start New Session", use_container_width=True):
+                reset_profile_and_memory()
+                st.success("New session started!")
+                st.rerun()
 
+        # ===== GLOSSARY (Only show if exists) =====
         if st.session_state.glossary:
             st.markdown("---")
             st.subheader("📘 My Glossary")
