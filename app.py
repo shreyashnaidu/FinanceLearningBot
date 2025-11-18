@@ -1742,15 +1742,19 @@ def main():
                 key="custom_asset_input"
             )
 
+            if not asset_query or not asset_query.strip():
+                st.warning("⚠️ Please enter an asset class")
+
         if st.button("📈 View Historical Performance", use_container_width=True):
-            with st.spinner(f"Retrieving data for {asset_query}..."):
-                hist_data = get_historical_performance(asset_query)
-                st.session_state.historical_data_display = {
-                    'type': 'asset_performance',
-                    'data': hist_data,
-                    'asset': asset_query
-                }
-            st.rerun()
+            if asset_query and asset_query.strip() and asset_query != "Other":
+                with st.spinner(f"Retrieving data for {asset_query}..."):
+                    hist_data = get_historical_performance(asset_query)
+                    st.session_state.historical_data_display = {
+                        'type': 'asset_performance',
+                        'data': hist_data,
+                        'asset': asset_query
+                    }
+                st.rerun()
     
     with col_hist2:
         st.markdown("**Market Events Analysis**")
@@ -1768,15 +1772,19 @@ def main():
                 key="custom_event_input"
             )
 
+            if not event_query or not event_query.strip():
+                st.warning("⚠️ Please enter a market event")
+
         if st.button("📉 View Event Impact", use_container_width=True):
-            with st.spinner(f"Analyzing {event_query}..."):
-                event_data = get_market_event_data(event_query)
-                st.session_state.historical_data_display = {
-                    'type': 'market_event',
-                    'data': event_data,
-                    'event': event_query
-                }
-            st.rerun()
+            if event_query and event_query.strip() and event_query != "Other":
+                with st.spinner(f"Analyzing {event_query}..."):
+                    event_data = get_market_event_data(event_query)
+                    st.session_state.historical_data_display = {
+                        'type': 'market_event',
+                        'data': event_data,
+                        'event': event_query
+                    }
+                st.rerun()
     
     # Display historical data if exists
     if st.session_state.get('historical_data_display'):
