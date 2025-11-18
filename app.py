@@ -1317,39 +1317,6 @@ def main():
                         st.session_state.load_message = f"🗑️ Deleted '{deleted_name}'"
                         st.rerun()
                 
-                st.markdown("**Export/Import**")
-                
-                snapshot_to_export = saved_portfolios[selected_idx]
-                serialized = serialize_snapshot(snapshot_to_export)
-                
-                st.download_button(
-                    label="⬇️ Export",
-                    data=serialized,
-                    file_name=f"{snapshot_to_export['name'].replace(' ', '_')}.portfolio",
-                    mime="text/plain",
-                    use_container_width=True
-                )
-                
-                uploaded_file = st.file_uploader(
-                    "Import Portfolio File",
-                    type=["portfolio"],
-                    key="portfolio_import"
-                )
-                
-                if uploaded_file is not None:
-                    try:
-                        serialized_data = uploaded_file.read().decode()
-                        imported_snapshot = deserialize_snapshot(serialized_data)
-                        imported_name = imported_snapshot.get('name', 'Imported Portfolio')
-                        imported_snapshot['timestamp'] = datetime.now().isoformat()
-                        filename = f"{imported_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                        filepath = os.path.join(PORTFOLIOS_DIR, filename)
-                        with open(filepath, 'w') as f:
-                            json.dump(imported_snapshot, f, indent=2)
-                        st.success(f"✅ Imported '{imported_name}'!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Failed to import: {str(e)}")
             else:
                 st.info("No saved portfolios yet")
         
@@ -1403,7 +1370,7 @@ def main():
         st.subheader(f"💡 Investment Recommendations ({rec_data['risk_tolerance']} Risk)")
         st.markdown(rec_data["recommendations"])
 
-        if st.button("🗑️ Clear Recommendations"):
+        if st.button("🗑️ Clear Recommendations", key="clear_recommendations"):
             st.session_state.investment_recommendations = None
             st.rerun()
 
@@ -1494,11 +1461,11 @@ def main():
             st.markdown("**Analysis:**")
             st.markdown(comp_data["comparison"])
 
-            if st.button("🗑️ Clear Comparison"):
+            if st.button("🗑️ Clear Comparison", key="clear_portfolio_comparison"):
                 st.session_state.portfolio_comparison = None
                 st.rerun()
 
-        if st.button("🗑️ Clear Allocation"):
+        if st.button("🗑️ Clear Allocation", key="clear_allocation"):
             st.session_state.suggested_allocation = None
             st.session_state.portfolio_comparison = None
             st.rerun()
@@ -1523,7 +1490,7 @@ def main():
         if analysis:
             st.markdown(analysis)
 
-        if st.button("🗑️ Clear Analysis"):
+        if st.button("🗑️ Clear Analysis", key="clear_portfolio_analysis"):
             st.session_state.portfolio_analysis_only = None
             st.rerun()
 
@@ -1803,49 +1770,12 @@ def main():
             st.markdown("### 📊 Portfolio Allocation Comparison")
             st.markdown(hist_display['data'])
         
-        if st.button("🗑️ Clear Historical Data"):
+        if st.button("🗑️ Clear Historical Data", key="clear_historical_data"):
             st.session_state.historical_data_display = None
             st.rerun()
         
         st.markdown("---")
     
-    # Portfolio comparison with historical evidence
-    st.markdown("**Compare Portfolio Allocations (Historical Evidence)**")
-    
-    col_comp1, col_comp2, col_comp3 = st.columns(3)
-    
-    with col_comp1:
-        alloc1 = st.text_input(
-            "Portfolio 1:",
-            placeholder="e.g., 60% stocks / 40% bonds",
-            key="hist_alloc1"
-        )
-    
-    with col_comp2:
-        alloc2 = st.text_input(
-            "Portfolio 2:",
-            placeholder="e.g., 100% stocks",
-            key="hist_alloc2"
-        )
-    
-    with col_comp3:
-        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-        if st.button("⚖️ Compare", use_container_width=True, key="compare_historical_allocations"):
-            if alloc1.strip() and alloc2.strip():
-                with st.spinner("Comparing historical performance..."):
-                    comparison = compare_allocation_performance(alloc1, alloc2)
-                    st.session_state.backtest_results = None
-                    st.session_state.strategy_comparison = None
-                    st.session_state.crisis_backtest = None
-                    st.session_state.historical_data_display = {
-                        'type': 'allocation_comparison',
-                        'data': comparison,
-                        'alloc1': alloc1,
-                        'alloc2': alloc2
-                    }
-                st.rerun()
-            else:
-                st.warning("Please enter both portfolio allocations to compare")
 
     # ============= User Story 9: Backtesting UI =============
     st.markdown("---")
@@ -2001,7 +1931,7 @@ def main():
             with cols[i % 5]:
                 st.caption(f"{year}: {ret}")
         
-        if st.button("🗑️ Clear Backtest"):
+        if st.button("🗑️ Clear Backtest", key="clear_backtest"):
             st.session_state.backtest_results = None
             st.rerun()
         
@@ -2034,7 +1964,7 @@ def main():
         st.markdown("**Analysis:**")
         st.markdown(comp_data['comparison'])
         
-        if st.button("🗑️ Clear Comparison"):
+        if st.button("🗑️ Clear Comparison", key="clear_strategy_comparison"):
             st.session_state.strategy_comparison = None
             st.rerun()
         
@@ -2048,7 +1978,7 @@ def main():
         crisis_data = st.session_state.crisis_backtest
         st.markdown(crisis_data['analysis'])
         
-        if st.button("🗑️ Clear Crisis Analysis"):
+        if st.button("🗑️ Clear Crisis Analysis", key="clear_crisis_analysis"):
             st.session_state.crisis_backtest = None
             st.rerun()
         
