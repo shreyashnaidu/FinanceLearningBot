@@ -1062,7 +1062,6 @@ def main():
     apply_pending_load()
 
     st.title("💰 Finance Learning Bot - AI Goal Mentor")
-    st.markdown("### Your Personal Financial Education Assistant")
 
     # Display load/save messages
     if st.session_state.get("load_message"):
@@ -1418,12 +1417,6 @@ def main():
         else:
             st.info("No saved portfolios yet. Save your current session above!")
 
-        st.markdown("---")
-        st.markdown("### About")
-        st.info(
-            "This AI mentor breaks down learning goals and provides portfolio guidance."
-        )
-
         if st.session_state.glossary:
             st.markdown("---")
             st.subheader("📘 My Glossary")
@@ -1591,57 +1584,118 @@ def main():
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.subheader("🎯 Enter Your Financial Learning Goal")
-        goal_input = st.text_area(
-            "What would you like to learn about finance?",
-            placeholder=(
-                "Example: Learn about stock market investing, Understand retirement "
-                "planning, Master personal budgeting..."
-            ),
-            height=100,
-        )
+        # ============= UNIFIED MENTOR INTERFACE =============
+        with st.form(key="mentor_form", clear_on_submit=False):
+            # Radio buttons for selecting the action type
+            action_type = st.radio(
+                "What would you like to do?",
+                options=["📚 Generate Learning Path", "❓ Explain a Concept", "🤔 Explain Why"],
+                horizontal=True,
+                key="mentor_action_type",
+                help="📚 Generate Learning Path: Create a step-by-step plan to achieve your financial goal | ❓ Explain a Concept: Get simple explanations of financial terms | 🤔 Explain Why: Understand the reasoning behind recommendations"
+            )
 
-        if st.button("🚀 Generate Learning Path", type="primary"):
-            if goal_input.strip():
-                with st.spinner("Creating your personalized learning path..."):
-                    portfolio_for_goal: Dict[str, float] = {}
-                    if stocks > 0:
-                        portfolio_for_goal["Stocks"] = stocks
-                    if bonds > 0:
-                        portfolio_for_goal["Bonds"] = bonds
-                    if cash > 0:
-                        portfolio_for_goal["Cash"] = cash
-                    if real_estate > 0:
-                        portfolio_for_goal["Real Estate"] = real_estate
-                    if crypto > 0:
-                        portfolio_for_goal["Cryptocurrency"] = crypto
-                    if other > 0:
-                        portfolio_for_goal["Other"] = other
+            # Single unified text input with dynamic placeholder
+            if action_type == "📚 Generate Learning Path":
+                placeholder = "Example: Learn about stock market investing, Understand retirement planning, Master personal budgeting..."
+                help_text = "Enter your financial learning goal"
+            elif action_type == "❓ Explain a Concept":
+                placeholder = "Example: What is a dividend yield? What are bonds?"
+                help_text = "Ask about any financial term or concept"
+            else:  # "🤔 Explain Why"
+                placeholder = 'Examples: "Why 30% in bonds and not 20%?", "Why not cryptocurrency?", "Why learn about bonds before stocks?"'
+                help_text = "Ask why the bot recommended something"
 
-                    initial_state: GoalState = {
-                        "goal": goal_input,
-                        "subtasks": [],
-                        "completed_tasks": [],
-                        "user_info": {
-                            "age": age,
-                            "risk_tolerance": risk_tolerance,
-                            "savings": savings,
-                            "has_401k": has_401k,
-                            "retirement_balance": retirement_balance,
-                            "has_stocks": has_stocks,
-                            "stock_value": stock_value,
-                            "experience": experience.lower(),
-                            "time": time_available,
-                        },
-                        "messages": [],
-                        "portfolio": portfolio_for_goal,
-                        "portfolio_analysis": "",
-                    }
-                    result = graph.invoke(initial_state)
-                    st.session_state.goal_state = result
-                st.success("✅ Learning path created successfully!")
+            user_input = st.text_input(
+                help_text,
+                placeholder=placeholder,
+                key="unified_mentor_input"
+            )
+
+            # Single submit button that handles all three cases (Enter key will also submit)
+            submitted = st.form_submit_button("🚀 Submit", type="primary")
+        
+        if submitted:
+            user_input = st.session_state.get("unified_mentor_input", "")
+            action_type = st.session_state.get("mentor_action_type", "📚 Generate Learning Path")
+            
+            if user_input.strip():
+                if action_type == "📚 Generate Learning Path":
+                    # Your existing "Generate Learning Path" logic
+                    with st.spinner("Creating your personalized learning path..."):
+                        portfolio_for_goal: Dict[str, float] = {}
+                        if stocks > 0:
+                            portfolio_for_goal["Stocks"] = stocks
+                        if bonds > 0:
+                            portfolio_for_goal["Bonds"] = bonds
+                        if cash > 0:
+                            portfolio_for_goal["Cash"] = cash
+                        if real_estate > 0:
+                            portfolio_for_goal["Real Estate"] = real_estate
+                        if crypto > 0:
+                            portfolio_for_goal["Cryptocurrency"] = crypto
+                        if other > 0:
+                            portfolio_for_goal["Other"] = other
+
+                        initial_state: GoalState = {
+                            "goal": user_input,
+                            "subtasks": [],
+                            "completed_tasks": [],
+                            "user_info": {
+                                "age": age,
+                                "risk_tolerance": risk_tolerance,
+                                "savings": savings,
+                                "has_401k": has_401k,
+                                "retirement_balance": retirement_balance,
+                                "has_stocks": has_stocks,
+                                "stock_value": stock_value,
+                                "experience": experience.lower(),
+                                "time": time_available,
+                            },
+                            "messages": [],
+                            "portfolio": portfolio_for_goal,
+                            "portfolio_analysis": "",
+                        }
+                        result = graph.invoke(initial_state)
+                        st.session_state.goal_state = result
+                    st.success("✅ Learning path created successfully!")
+                    st.rerun()
+                    
+                elif action_type == "❓ Explain a Concept":
+                    # Your existing "Ask Your Mentor" logic
+                    with st.spinner("Teaching you finance wisdom..."):
+                        answer = explain_finance_term(user_input)
+                        st.session_state.explanation = answer
+                        st.session_state.glossary.append((user_input, answer))
+                    st.success("✅ Explained!")
+                    render_explanation_card(st.session_state.explanation, user_input)
+                    
+                else:  # "🤔 Explain Why"
+                    # Your existing "Why?" logic
+                    with st.spinner("Explaining the reasoning behind your recommendations..."):
+                        reasoning = explain_recommendation(
+                            user_input,
+                            risk_tolerance=risk_tolerance,
+                            age=age,
+                            time_available=time_available,
+                            experience=experience,
+                            suggested_allocation=st.session_state.get("suggested_allocation"),
+                            investment_recs=st.session_state.get("investment_recommendations"),
+                            goal_state=st.session_state.get("goal_state"),
+                        )
+                        st.session_state.reasoning_answer = reasoning
+                        st.session_state.glossary.append((f"Why: {user_input}", reasoning))
+                    st.success("✅ Reasoning explained!")
+                    render_explanation_card(st.session_state.reasoning_answer, term="Why this recommendation?")
             else:
-                st.warning("Please enter a goal first!")
+                st.warning("Please enter your question or goal first!")
+
+        # Display stored explanation if exists
+        if st.session_state.explanation and st.session_state.get("mentor_action_type") == "❓ Explain a Concept":
+            render_explanation_card(st.session_state.explanation, st.session_state.get("unified_mentor_input", ""))
+            
+        if st.session_state.get("reasoning_answer") and st.session_state.get("mentor_action_type") == "🤔 Explain Why":
+            render_explanation_card(st.session_state.reasoning_answer, term="Why this recommendation?")
 
     with col2:
         st.subheader("📊 Progress Overview")
@@ -1650,33 +1704,74 @@ def main():
             total_tasks = len(gs["subtasks"])
             completed = sum(1 for t in gs["subtasks"] if t["completed"])
             progress = (completed / total_tasks * 100) if total_tasks > 0 else 0.0
-            st.metric("Total Tasks", total_tasks)
-            st.metric("Completed", completed)
+            
+            # Display metrics side-by-side
+            col_metric1, col_metric2 = st.columns(2)
+            with col_metric1:
+                st.metric("Total Tasks", total_tasks)
+            with col_metric2:
+                st.metric("Completed", completed)
+            
             st.progress(progress / 100)
             st.caption(f"{progress:.0f}% Complete")
         else:
             st.info("Enter a goal to see your progress!")
 
-    # Ask Your Mentor (concept explanations)
-    st.markdown("---")
-    st.subheader("💬 Ask Your Mentor")
-    user_question = st.text_input(
-        "Confused about a financial term?",
-        placeholder="Example: What is a dividend yield?",
-    )
-    if st.button("❓ Explain This"):
-        if user_question.strip():
-            with st.spinner("Teaching you finance wisdom..."):
-                answer = explain_finance_term(user_question)
-                st.session_state.explanation = answer
-                st.session_state.glossary.append((user_question, answer))
-            st.success("✅ Explained!")
-        else:
-            st.warning("Please enter a question.")
-    if st.session_state.explanation:
-        render_explanation_card(st.session_state.explanation, user_question)
+    # Display Learning Path
+    gs = st.session_state.get("goal_state")
+    if gs and gs.get("subtasks"):
+        st.markdown("---")
+        st.subheader("📚 Your Learning Path")
+        st.markdown(f"**Goal:** {gs['goal']}")
+        st.markdown("### Tasks")
 
-    # Historical Data Section
+        for idx, task in enumerate(gs["subtasks"]):
+            col_task, col_button = st.columns([4, 1])
+
+            with col_task:
+                if task["completed"]:
+                    st.markdown(f"~~{idx + 1}. {task['task']}~~ ✅")
+                else:
+                    st.markdown(f"{idx + 1}. **{task['task']}**")
+
+            with col_button:
+                if not task["completed"]:
+                    if st.button("✓ Complete", key=f"complete_{idx}"):
+                        st.session_state.goal_state["subtasks"][idx]["completed"] = True
+                        st.rerun()
+
+        st.markdown("---")
+        col_reset, col_export = st.columns(2)
+        with col_reset:
+            if st.button("🔄 Start New Goal"):
+                st.session_state.goal_state = None
+                st.rerun()
+        with col_export:
+            if st.button("🔥 Export Learning Path"):
+                export_text = f"Finance Learning Goal: {gs['goal']}\n\n"
+
+                if gs.get("portfolio"):
+                    export_text += "Portfolio Allocation:\n"
+                    for asset, pct in gs["portfolio"].items():
+                        export_text += f"  {asset}: {pct}%\n"
+                    export_text += "\n"
+
+                if gs.get("portfolio_analysis"):
+                    export_text += "Portfolio Analysis:\n"
+                    export_text += gs["portfolio_analysis"] + "\n\n"
+
+                export_text += "Learning Path:\n"
+                for i, t in enumerate(gs["subtasks"]):
+                    status = "✅" if t["completed"] else "⬜"
+                    export_text += f"{i + 1}. {status} {t['task']}\n"
+
+                st.download_button(
+                    label="Download as Text",
+                    data=export_text,
+                    file_name="learning_path.txt",
+                    mime="text/plain",
+                )
+
     st.markdown("---")
     st.subheader("📊 Historical Performance Data")
     
@@ -1980,99 +2075,6 @@ def main():
             st.rerun()
         
         st.markdown("---")
-
-    # User Story 6 - "Why?" Section
-    st.markdown("---")
-    st.subheader("🤔 Ask 'Why?' About My Plan")
-    why_q = st.text_input(
-        "Ask why the bot recommended something (allocations, avoiding assets, or the learning order).",
-        placeholder=(
-            'Examples: "Why 30% in bonds and not 20%?", '
-            '"Why not cryptocurrency?", '
-            '"Why learn about bonds before stocks?"'
-        ),
-    )
-
-    if st.button("🧠 Explain the reasoning"):
-        if why_q.strip():
-            with st.spinner("Explaining the reasoning behind your recommendations..."):
-                reasoning = explain_recommendation(
-                    why_q,
-                    risk_tolerance=risk_tolerance,
-                    age=age,
-                    time_available=time_available,
-                    experience=experience,
-                    suggested_allocation=st.session_state.get("suggested_allocation"),
-                    investment_recs=st.session_state.get("investment_recommendations"),
-                    goal_state=st.session_state.get("goal_state"),
-                )
-                st.session_state.reasoning_answer = reasoning
-                # Save to glossary so user can review later
-                st.session_state.glossary.append((f"Why: {why_q}", reasoning))
-            st.success("✅ Reasoning explained!")
-        else:
-            st.warning("Please type a 'why' question first.")
-
-    if st.session_state.get("reasoning_answer"):
-        render_explanation_card(
-            st.session_state.reasoning_answer,
-            term="Why this recommendation?",
-        )
-
-    # Display Learning Path
-    gs = st.session_state.get("goal_state")
-    if gs and gs.get("subtasks"):
-        st.markdown("---")
-        st.subheader("📚 Your Learning Path")
-        st.markdown(f"**Goal:** {gs['goal']}")
-        st.markdown("### Tasks")
-
-        for idx, task in enumerate(gs["subtasks"]):
-            col_task, col_button = st.columns([4, 1])
-
-            with col_task:
-                if task["completed"]:
-                    st.markdown(f"~~{idx + 1}. {task['task']}~~ ✅")
-                else:
-                    st.markdown(f"{idx + 1}. **{task['task']}**")
-
-            with col_button:
-                if not task["completed"]:
-                    if st.button("✓ Complete", key=f"complete_{idx}"):
-                        st.session_state.goal_state["subtasks"][idx]["completed"] = True
-                        st.rerun()
-
-        st.markdown("---")
-        col_reset, col_export = st.columns(2)
-        with col_reset:
-            if st.button("🔄 Start New Goal"):
-                st.session_state.goal_state = None
-                st.rerun()
-        with col_export:
-            if st.button("📥 Export Learning Path"):
-                export_text = f"Finance Learning Goal: {gs['goal']}\n\n"
-
-                if gs.get("portfolio"):
-                    export_text += "Portfolio Allocation:\n"
-                    for asset, pct in gs["portfolio"].items():
-                        export_text += f"  {asset}: {pct}%\n"
-                    export_text += "\n"
-
-                if gs.get("portfolio_analysis"):
-                    export_text += "Portfolio Analysis:\n"
-                    export_text += gs["portfolio_analysis"] + "\n\n"
-
-                export_text += "Learning Path:\n"
-                for i, t in enumerate(gs["subtasks"]):
-                    status = "✅" if t["completed"] else "⬜"
-                    export_text += f"{i + 1}. {status} {t['task']}\n"
-
-                st.download_button(
-                    label="Download as Text",
-                    data=export_text,
-                    file_name="learning_path.txt",
-                    mime="text/plain",
-                )
 
 
 if __name__ == "__main__":
