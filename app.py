@@ -1534,43 +1534,41 @@ def main():
 
     with col1:
         # ============= UNIFIED MENTOR INTERFACE =============
+        action_type = st.radio(
+            "What would you like to do?",
+            options=["📚 Generate Learning Path", "❓ Explain a Concept", "🤔 Explain Why"],
+            horizontal=True,
+            key="mentor_action_type",
+            help="📚 Generate Learning Path: Create a step-by-step plan | ❓ Explain a Concept: Get simple explanations | 🤔 Explain Why: Understand the reasoning"
+        )
+        if action_type == "📚 Generate Learning Path":
+            placeholder = "Example: Learn about stock market investing, Understand retirement planning, Master personal budgeting..."
+            help_text = "Enter your financial learning goal"
+            label_text = "Enter your financial learning goal"
+        elif action_type == "❓ Explain a Concept":
+            placeholder = "Example: What is a dividend yield? What are bonds?"
+            help_text = "Ask about any financial term or concept"
+            label_text = "Ask about any financial term or concept"
+        else:  # "🤔 Explain Why"
+            placeholder = 'Examples: "Why 30% in bonds?", "Why not cryptocurrency?", "Why learn about bonds first?"'
+            help_text = "Ask why the bot recommended something"
+            label_text = "Ask why the bot recommended something"
+        
         with st.form(key="mentor_form", clear_on_submit=False):
-            # Radio buttons for selecting the action type
-            action_type = st.radio(
-                "What would you like to do?",
-                options=["📚 Generate Learning Path", "❓ Explain a Concept", "🤔 Explain Why"],
-                horizontal=True,
-                key="mentor_action_type",
-                help="📚 Generate Learning Path: Create a step-by-step plan to achieve your financial goal | ❓ Explain a Concept: Get simple explanations of financial terms | 🤔 Explain Why: Understand the reasoning behind recommendations"
-            )
-
-            # Single unified text input with dynamic placeholder
-            if action_type == "📚 Generate Learning Path":
-                placeholder = "Example: Learn about stock market investing, Understand retirement planning, Master personal budgeting..."
-                help_text = "Enter your financial learning goal"
-            elif action_type == "❓ Explain a Concept":
-                placeholder = "Example: What is a dividend yield? What are bonds?"
-                help_text = "Ask about any financial term or concept"
-            else:  # "🤔 Explain Why"
-                placeholder = 'Examples: "Why 30% in bonds and not 20%?", "Why not cryptocurrency?", "Why learn about bonds before stocks?"'
-                help_text = "Ask why the bot recommended something"
-
             user_input = st.text_input(
-                help_text,
+                label_text,
                 placeholder=placeholder,
-                key="unified_mentor_input"
+                key="unified_mentor_input",
+                help=help_text
             )
-
-            # Single submit button that handles all three cases (Enter key will also submit)
-            submitted = st.form_submit_button("🚀 Submit", type="primary")
+            
+            # Submit button
+            submitted = st.form_submit_button("🚀 Submit", type="primary", use_container_width=True)
         
         if submitted:
-            user_input = st.session_state.get("unified_mentor_input", "")
-            action_type = st.session_state.get("mentor_action_type", "📚 Generate Learning Path")
-            
             if user_input.strip():
                 if action_type == "📚 Generate Learning Path":
-                    # Your existing "Generate Learning Path" logic
+                    # Generate Learning Path logic
                     with st.spinner("Creating your personalized learning path..."):
                         portfolio_for_goal: Dict[str, float] = {}
                         if stocks > 0:
@@ -1611,17 +1609,17 @@ def main():
                     st.rerun()
                     
                 elif action_type == "❓ Explain a Concept":
-                    # Your existing "Ask Your Mentor" logic
+                    # Explain Concept logic
                     with st.spinner("Teaching you finance wisdom..."):
                         answer = explain_finance_term(user_input)
                         st.session_state.explanation = answer
                         st.session_state.glossary.append((user_input, answer))
                     st.success("✅ Explained!")
-                    render_explanation_card(st.session_state.explanation, user_input)
+                    render_explanation_card(answer, user_input)
                     
                 else:  # "🤔 Explain Why"
-                    # Your existing "Why?" logic
-                    with st.spinner("Explaining the reasoning behind your recommendations..."):
+                    # Explain Why logic
+                    with st.spinner("Explaining the reasoning..."):
                         reasoning = explain_recommendation(
                             user_input,
                             risk_tolerance=risk_tolerance,
@@ -1635,16 +1633,20 @@ def main():
                         st.session_state.reasoning_answer = reasoning
                         st.session_state.glossary.append((f"Why: {user_input}", reasoning))
                     st.success("✅ Reasoning explained!")
-                    render_explanation_card(st.session_state.reasoning_answer, term="Why this recommendation?")
+                    render_explanation_card(reasoning, term="Why this recommendation?")
             else:
                 st.warning("Please enter your question or goal first!")
-
-        # Display stored explanation if exists
-        if st.session_state.explanation and st.session_state.get("mentor_action_type") == "❓ Explain a Concept":
-            render_explanation_card(st.session_state.explanation, st.session_state.get("unified_mentor_input", ""))
-            
-        if st.session_state.get("reasoning_answer") and st.session_state.get("mentor_action_type") == "🤔 Explain Why":
-            render_explanation_card(st.session_state.reasoning_answer, term="Why this recommendation?")
+        
+        if not submitted:
+            if st.session_state.get("explanation") and action_type == "❓ Explain a Concept":
+                # Get the last glossary entry if it exists
+                if st.session_state.glossary:
+                    last_term, last_def = st.session_state.glossary[-1]
+                    if last_def == st.session_state.explanation:
+                        render_explanation_card(last_def, last_term)
+                
+            if st.session_state.get("reasoning_answer") and action_type == "🤔 Explain Why":
+                render_explanation_card(st.session_state.reasoning_answer, term="Why this recommendation?")
 
     with col2:
         st.subheader("📊 Progress Overview")
@@ -1828,10 +1830,13 @@ def main():
     
     with col_comp3:
         st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-        if st.button("⚖️ Compare", use_container_width=True):
+        if st.button("⚖️ Compare", use_container_width=True, key="compare_historical_allocations"):
             if alloc1.strip() and alloc2.strip():
                 with st.spinner("Comparing historical performance..."):
                     comparison = compare_allocation_performance(alloc1, alloc2)
+                    st.session_state.backtest_results = None
+                    st.session_state.strategy_comparison = None
+                    st.session_state.crisis_backtest = None
                     st.session_state.historical_data_display = {
                         'type': 'allocation_comparison',
                         'data': comparison,
