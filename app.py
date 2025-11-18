@@ -1733,7 +1733,15 @@ def main():
             ["Index Funds", "S&P 500", "Bonds", "Stocks", "Real Estate", "Other"],
             key="asset_performance_select"
         )
-        
+
+        # Show text input if "Other" is selected
+        if asset_query == "Other":
+            asset_query = st.text_input(
+                "Specify Asset Class:",
+                placeholder="e.g., Commodities, International Stocks, Treasury Bills",
+                key="custom_asset_input"
+            )
+
         if st.button("📈 View Historical Performance", use_container_width=True):
             with st.spinner(f"Retrieving data for {asset_query}..."):
                 hist_data = get_historical_performance(asset_query)
@@ -1751,7 +1759,15 @@ def main():
             ["2008 Financial Crisis", "COVID-19 Crash", "Dot-com Bubble", "Other"],
             key="market_event_select"
         )
-        
+
+        # Show text input if "Other" is selected
+        if event_query == "Other":
+            event_query = st.text_input(
+                "Specify Market Event:",
+                placeholder="e.g., Black Monday 1987, Asian Financial Crisis, Crypto Winter",
+                key="custom_event_input"
+            )
+
         if st.button("📉 View Event Impact", use_container_width=True):
             with st.spinner(f"Analyzing {event_query}..."):
                 event_data = get_market_event_data(event_query)
