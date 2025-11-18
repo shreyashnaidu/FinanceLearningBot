@@ -246,9 +246,9 @@ pytest tests/test_user_story_5.py -v
 ```bash
 python -m unittest tests/test_user_story_6.py -v
 ```
-✅ Scenario 1: Allocation explanation (why 30% bonds vs 20%)
-✅ Scenario 2: Explanation for avoiding cryptocurrency tailored to risk tolerance
-✅ Scenario 3: Learning path reasoning (why study bonds before stocks)
+-✅ Scenario 1: Allocation explanation (why 30% bonds vs 20%)
+-✅ Scenario 2: Explanation for avoiding cryptocurrency tailored to risk tolerance
+-✅ Scenario 3: Learning path reasoning (why study bonds before stocks)
 
 **UI Features:**
 - “Explain This” input box for asking any “why” question connected to prior recommendations
@@ -288,9 +288,9 @@ pytest tests/test_user_story_6.py -v
 ```bash
 python -m unittest tests/test_user_story_7.py -v
 ```
-✅ Scenario 1: Reset Memory clears all stored bot outputs
-✅ Scenario 2: Start New Session resets all profile fields to defaults
-✅ Scenario 3: Incorrect data is successfully removed, ensuring clean re-entry)
+-✅ Scenario 1: Reset Memory clears all stored bot outputs
+-✅ Scenario 2: Start New Session resets all profile fields to defaults
+-✅ Scenario 3: Incorrect data is successfully removed, ensuring clean re-entry)
 
 **UI Features:**
 - “🧹 Reset Memory” button clears recommendations, reasoning, allocations, glossary, and portfolio analysis
