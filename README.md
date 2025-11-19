@@ -2,10 +2,17 @@
 
 An AI-powered investment education assistant built with LangGraph and Streamlit.
 
+## Table of Contents
+- [Team Members](#team-members)
+- [Setup](#setup)
+- [First Iteration](#first-iteration)
+- [Second Iteration](#second-iteration)
+- [Peer Review Feedback](#peer-review-feedback)
+
 ## Team Members
 - Abhishek Harish Thumar
-- Shreyash Naidu Mamidi
 - Kyle Lobo
+- Shreyash Naidu Mamidi
 
 ## Setup
 
@@ -14,7 +21,6 @@ An AI-powered investment education assistant built with LangGraph and Streamlit.
 - OpenAI API key
 
 ### Installation
-
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -25,6 +31,7 @@ echo "OPENAI_API_KEY=your_key_here" > .env
 # Run the app
 streamlit run app.py
 ```
+
 ## First Iteration
 
 ### User Story 1: Financial Situation Input and Goal Decomposition
@@ -49,7 +56,6 @@ python -m unittest test_user_story_1.py -v
 - ✅ Scenario 3: Acknowledges current assets
 
 ## Running Tests
-
 ```bash
 python -m unittest test_user_story_1.py -v
 ```
@@ -88,7 +94,6 @@ pytest tests/test_user_story_2.py -v
 
 
 ## Running Tests
-
 ```bash
 # User Story 2: Portfolio Guidance
 pytest tests/test_user_story_2.py -v
@@ -103,7 +108,7 @@ pytest tests/test_user_story_2.py -v
 - Automatically highlights next recommended task
 - Phase-based unlocking (Phase 2 only visible once Phase 1 completed)
 - Session state preserves task progress
-- Added “Ask Mentor” glossary-based learning support (stores explained terms)
+- Added "Ask Mentor" glossary-based learning support (stores explained terms)
 
 
 **Changes Made:**
@@ -111,7 +116,7 @@ pytest tests/test_user_story_2.py -v
 2. Added progress metrics and completion bar in UI
 3. Added task button logic to mark as complete and auto-advance
 4. Added glossary sidebar to store terms + explanations
-5. Integrated “Ask Mentor” section to explain finance terms in-app
+5. Integrated "Ask Mentor" section to explain finance terms in-app
 
 **Test Results:**
 ```bash
@@ -120,21 +125,18 @@ python -m unittest tests/test_user_story_3.py -v
 - ✅ Scenario 1: Progress bar increases correctly as tasks are completed (33% at 5/15 tasks)
 - ✅ Scenario 2: Completing a task activates the next task in sequence
 - ✅ Scenario 3: Phase 2 tasks remain locked until all Phase 1 tasks are completed
-- ✅ Scenario 3: Phase 2 tasks remain locked until all Phase 1 tasks are completed
 
 **UI Features:**
 - Strike-through with ✅ indicator for completed tasks
-- Automatic “next task” activation to guide learning flow
+- Automatic "next task" activation to guide learning flow
 - Sequential phase unlocking to maintain structured learning
 - Glossary panel to review previously explained financial terms
-- “Explain This” assistant input for real-time concept clarification
+- "Explain This" assistant input for real-time concept clarification
 
 
 ## Running Tests
-
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
-
 ```
 
 ## Second Iteration
@@ -221,16 +223,16 @@ pytest tests/test_user_story_5.py -v
 pytest tests/test_user_story_5.py -v
 ```
 
-### User Story 6: Explain “Why?” Behind Recommendations
+### User Story 6: Explain "Why?" Behind Recommendations
 **Issue:** [#6](https://github.com/vcu-cmsc-damevski/project-fastcar777/issues/6)
 
 **Implementation:**
-- Added an AI explanation engine for answering “why” questions about portfolio or learning recommendations  
+- Added an AI explanation engine for answering "why" questions about portfolio or learning recommendations  
 - System explains reasoning based on user profile (age, risk tolerance, time horizon, experience)
 - Supports explaining:
-  - Portfolio allocations (e.g., “Why 30% bonds instead of 20%?”)
-  - Risk-based exclusions (e.g., “Why avoid cryptocurrency?”)
-  - Learning path ordering (e.g., “Why learn bonds before stocks?”)
+  - Portfolio allocations (e.g., "Why 30% bonds instead of 20%?")
+  - Risk-based exclusions (e.g., "Why avoid cryptocurrency?")
+  - Learning path ordering (e.g., "Why learn bonds before stocks?")
 - Uses investment principles (diversification, volatility, compounding, risk/return) in explanations
 - Designed for short, clear, beginner-friendly reasoning
 - All 3 scenarios implemented and tested
@@ -240,7 +242,7 @@ pytest tests/test_user_story_5.py -v
 2. Added structured reasoning prompt referencing allocation, recommendations, and learning path  
 3. Session state support for storing last allocation, last recommendations, and goal state for explanation  
 4. Modular design for reuse across different recommendation types (portfolio or learning tasks)  
-5. Optional UI additions for “Why?” questions and reasoning display  
+5. Optional UI additions for "Why?" questions and reasoning display  
 
 **Test Results:**
 ```bash
@@ -251,7 +253,7 @@ python -m unittest tests/test_user_story_6.py -v
 - ✅ Scenario 3: Learning path reasoning (why study bonds before stocks)
 
 **UI Features:**
-- “Explain This” input box for asking any “why” question connected to prior recommendations
+- "Explain This" input box for asking any "why" question connected to prior recommendations
 - AI-generated reasoning displayed in a clean formatted explanation card
 - Explanations automatically connect to user profile (age, risk tolerance, time horizon, experience)
 - Works for portfolio suggestions, investment warnings, and learning path sequences
@@ -290,11 +292,11 @@ python -m unittest tests/test_user_story_7.py -v
 ```
 - ✅ Scenario 1: Reset Memory clears all stored bot outputs
 - ✅ Scenario 2: Start New Session resets all profile fields to defaults
-- ✅ Scenario 3: Incorrect data is successfully removed, ensuring clean re-entry.
+- ✅ Scenario 3: Incorrect data is successfully removed, ensuring clean re-entry
 
 **UI Features:**
-- “🧹 Reset Memory” button clears recommendations, reasoning, allocations, glossary, and portfolio analysis
-- “🔄 Start New Session” fully resets all user profile fields plus memory
+- "🧹 Reset Memory" button clears recommendations, reasoning, allocations, glossary, and portfolio analysis
+- "🔄 Start New Session" fully resets all user profile fields plus memory
 - Clean confirmation messages guiding users through reset actions
 - Ensures recommendations never reference stale or incorrect data
 - Safe, isolated session state preventing data leakage between sessions
@@ -350,7 +352,6 @@ pytest tests/test_user_story_8.py -v
 - Clear button to remove displayed data
 
 ## Running Tests
-
 ```bash
 # User Story 8: Historical Data
 pytest tests/test_user_story_8.py -v
@@ -411,3 +412,102 @@ python tests/test_user_story_10.py
 - ✅ Scenario 2: Load previous session after restart, restoring all details
 - ✅ Scenario 3: Manage multiple portfolios (select, load, delete from disk)
 - ✅ Additional: Persistence across sessions, serialization, empty state handling
+
+## Peer Review Feedback
+
+### Feedback from "Moon Walkers" Team
+
+**Date:** November 15, 2024
+
+**Reviewers:** Aneesh Reddy, Abhinav, Ritvik
+
+**Overall Comments:**
+The finance learning bot is working well. We tested the app for about 30 minutes and explored different features. AI responses are helpful and relevant to finance topics.
+
+**What we liked:**
+- Portfolio analysis gives detailed feedback
+- The backtesting feature is interesting, we could see historical performance
+- AI explains concepts clearly when asked
+- Save/load feature worked when we closed and reopened
+
+**Issues we found:**
+1. **Too much in sidebar** - The sidebar is very crowded. We had to scroll a lot to find different options. Maybe put some things in expandable sections?
+
+2. **Multiple input boxes confusing** - There are 3 different text boxes to type in. We weren't sure which one to use when. The examples help but still confusing.
+
+3. **Profile section** - Lot of fields to fill in the profile. Some of these can be optional or hidden until needed.
+
+4. **Main page is too long** - Had to scroll down a lot to see all features. Better organization would help.
+
+**Suggestions:**
+- [x] Add some help text or tooltips for finance terms
+- [x] Make the UI more compact, too much scrolling right now
+- [x] The color coding for risk (🟢🟡🔴) is good, use more visuals like that
+
+---
+
+### Feedback from "Smart Study Assistant Bot" Team
+
+**Date:** November 15, 2024
+
+**Reviewers:** Preetham Reddy Tekula, Balcharan Reddy Adla, Ajay Kumar Reddy Jambula, Varsha Police
+
+**Overall:**
+Good finance education tool with many features. The AI gives helpful responses about investments and portfolios. We spent around 45 minutes testing different parts.
+
+**What worked well:**
+- Learning path for financial goals is useful
+- Portfolio recommendations based on risk tolerance
+- Historical data section has good information
+- Bot explains things in simple language
+- Could save our portfolio and load it back
+
+**Problems we noticed:**
+1. **Sidebar has too many options** - We kept opening different expandable sections looking for features. Takes time to understand where everything is.
+
+2. **Three input boxes** - Not clear which input to use for what. Should be one main input that's smarter.
+
+3. **Portfolio entry** - Entering percentages for all 6 asset types one by one is bit tedious. Works fine but could be smoother.
+
+4. **First time using** - When we opened first time, wasn't clear where to start or what to do. Some guidance would help.
+
+**Our suggestions:**
+- [x] Combine the input sections or make it clear which one to use when
+- [x] Organize sidebar better, group related things
+- [x] Add a quick start guide or tutorial for first time
+- [x] More visual indicators like the risk tolerance colors
+- [ ] Maybe highlight the main features somewhere
+
+**Good points:**
+- Backtesting with historical data is cool feature
+- Save/load worked smoothly
+- AI gives good explanations without too much jargon
+- Overall very functional app
+
+---
+
+## UI Improvements Implemented (Post Peer Review)
+
+Based on the peer review feedback, we implemented the following improvements:
+
+### Sidebar Organization
+- **Consolidated expandable sections**: Grouped related functionality (Additional Profile Details, Investment Tools, Portfolio Analysis, Save/Load Portfolio, Reset Options) into collapsible expanders
+- **Always visible core inputs**: Kept essential fields (Age, Risk Tolerance) always visible
+- **Reduced visual clutter**: Default collapsed state for advanced features reduces initial cognitive load
+
+### Unified Input Interface
+- **Single smart input box**: Combined "Generate Learning Path", "Ask Your Mentor", and "Explain Why" into one unified interface with radio button selection
+- **Clear action selection**: Radio buttons (📚 Generate Learning Path | ❓ Explain a Concept | 🤔 Explain Why) make it obvious which mode is active
+- **Dynamic placeholders**: Input placeholder text changes based on selected action to guide users
+- **Consistent submission**: Single "🚀 Submit" button works for all three modes
+
+### Visual Improvements
+- **Better section headers**: Added emoji indicators and clear section titles
+- **Improved spacing**: Reduced cramped feeling with better use of whitespace
+- **Help text**: Added contextual help text for each input mode
+- **Progress indicators**: Enhanced visual feedback for operations
+
+### User Experience
+- **Reduced scrolling**: Collapsible sections mean less scrolling to reach important features
+- **Clearer feature discovery**: Related features grouped logically (e.g., all investment tools together)
+- **Maintained functionality**: All 10 user stories still fully functional with improved accessibility
