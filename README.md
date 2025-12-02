@@ -512,6 +512,8 @@ Based on the peer review feedback, we implemented the following improvements:
 - **Clearer feature discovery**: Related features grouped logically (e.g., all investment tools together)
 - **Maintained functionality**: All 10 user stories still fully functional with improved accessibility
 
+---
+
 ### Summary of Design and Reasoning Changes
 
 The second iteration focused on improving **trust**, **predictability**, and **reasoning transparency** based on peer review feedback and iteration 2 requirements. Key improvements include:
