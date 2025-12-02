@@ -511,3 +511,346 @@ Based on the peer review feedback, we implemented the following improvements:
 - **Reduced scrolling**: Collapsible sections mean less scrolling to reach important features
 - **Clearer feature discovery**: Related features grouped logically (e.g., all investment tools together)
 - **Maintained functionality**: All 10 user stories still fully functional with improved accessibility
+
+### Summary of Design and Reasoning Changes
+
+The second iteration focused on improving **trust**, **predictability**, and **reasoning transparency** based on peer review feedback and iteration 2 requirements. Key improvements include:
+
+**Interaction Design Enhancements:**
+- **Collapsible Sidebar Sections**: Reduced visual clutter by grouping related features in expandable sections
+- **Unified Input Interface**: Combined three separate input boxes into one smart interface with radio button selection
+- **Enhanced Visual Feedback**: Added progress indicators, loading spinners, and color-coded status messages throughout
+- **Contextual Help**: Integrated tooltips, captions, and help text for all major features
+
+**Reasoning and Robustness:**
+- **Transparent AI Processing**: Loading spinners with descriptive text show what the AI is doing ("Creating your personalized learning path...", "Analyzing portfolio...")
+- **Explainability Features**: User Story 6 "Explain Why" functionality allows users to understand reasoning behind recommendations
+- **Error Handling**: Clear error messages with actionable guidance when issues occur
+- **Multi-mode Interaction**: Users can choose between passive (Ask questions) and directive (Generate learning path) modes
+
+---
+
+## Trust and Predictability by Design
+
+### Visual Cues for Confidence and Uncertainty
+
+Our system implements multiple visual indicators to help users understand system state and build trust:
+
+#### 1. **Progress Indicators**
+- **Learning Path Progress Bar**: Real-time visual representation (0-100%) showing task completion
+  ```python
+  st.progress(progress / 100)
+  st.caption(f"{progress:.0f}% Complete")
+  ```
+- **Metrics Display**: Side-by-side task counters (Total Tasks | Completed) provide instant status awareness
+
+#### 2. **Loading States with Context**
+Users always know what the system is doing through descriptive loading messages:
+- `"Creating your personalized learning path..."` - When generating goals
+- `"Generating recommendations..."` - When AI is computing investment advice
+- `"Analyzing your portfolio..."` - During portfolio health assessment
+- `"Backtesting over 10 years..."` - When running simulations
+- `"Teaching you finance wisdom..."` - When explaining concepts
+
+**Design Rationale**: Generic spinners create uncertainty. Our contextual messages set clear expectations and reduce anxiety during AI processing.
+
+#### 3. **Color-Coded Status Messages**
+- ✅ **Success (Green)**: `st.success("✅ Learning path created successfully!")`
+- ⚠️ **Warning (Yellow)**: `st.warning("⚠️ Total: 95% (need 100%)")`
+- 💡 **Info (Blue)**: `st.info("💡 Enter your portfolio allocation")`
+- ❌ **Error (Red)**: `st.error("❌ Error initializing OpenAI")`
+
+**Design Rationale**: Immediate visual feedback confirms actions and guides correction when needed.
+
+#### 4. **Risk Tolerance Visual Indicators**
+```python
+risk_colors = {
+    "Conservative": "🟢",
+    "Moderate": "🟡",
+    "Aggressive": "🔴",
+}
+```
+- **Conservative**: 🟢 "Capital preservation, steady income"
+- **Moderate**: 🟡 "Balanced growth with moderate risk"
+- **Aggressive**: 🔴 "Maximum growth, higher volatility"
+
+Users instantly recognize their risk level through color psychology and emoji cues.
+
+### Making System Behavior Predictable
+
+#### 1. **Structured Labels and Tooltips**
+Every interactive element includes clear labels and contextual help:
+```python
+st.button(
+    "📋 Get Risk-Based Recommendations",
+    help=f"Get investment options for {risk_tolerance} risk"
+)
+```
+
+Examples across the app:
+- "Total must equal 100% to analyze" - Disables button until condition met
+- "📚 Generate Learning Path | ❓ Explain a Concept | 🤔 Explain Why" - Clear mode selection
+- "Years: [5, 10, 20, 30]" - Explicit backtesting timeframe options
+
+#### 2. **Progressive Disclosure**
+Complex features are hidden in collapsible sections, reducing cognitive load:
+- **💼 Additional Profile Details** (Collapsed by default)
+- **💡 Investment Tools** (Collapsed by default)
+- **📊 Portfolio Analysis** (Collapsed by default)
+- **💾 Save/Load Portfolio** (Collapsed by default)
+- **🧹 Reset Options** (Collapsed by default)
+
+**Design Rationale**: Users see only what they need initially. Advanced features are discoverable but not overwhelming.
+
+#### 3. **Input Validation with Real-Time Feedback**
+Portfolio allocation provides instant validation:
+```python
+total_allocation = stocks + bonds + cash + real_estate + crypto + other
+if total_allocation == 100:
+    st.success(f"✅ Total: {total_allocation}%")
+elif total_allocation > 0:
+    st.warning(f"⚠️ Total: {total_allocation}% (need 100%)")
+```
+
+Users receive immediate feedback on input correctness before submission.
+
+#### 4. **Consistent Action Confirmation**
+Every major action includes:
+1. **Loading indicator** with descriptive text
+2. **Success message** confirming completion
+3. **Result display** showing output
+
+Example flow:
+```
+User clicks "Analyze Portfolio"
+→ "Analyzing your portfolio..." (spinner)
+→ "✅ Analysis complete!" (success)
+→ Portfolio analysis displayed
+```
+
+### Confidence Communication
+
+#### 1. **Disclaimer on Historical Data**
+```
+*Note: Past performance doesn't guarantee future results. 
+These are approximate historical averages.*
+```
+
+System acknowledges uncertainty in predictions, building trust through honesty.
+
+#### 2. **Explanation Cards with Attribution**
+When AI provides reasoning, it's clearly marked:
+```html
+🧠 Explanation (Why this recommendation?)
+```
+
+Users always know when content is AI-generated vs. historical data.
+
+#### 3. **Metrics with Tooltips**
+Complex metrics include help text:
+```python
+st.metric(
+    "Sharpe Ratio", 
+    f"{sharpe_ratio:.2f}",
+    help="Risk-adjusted return (higher is better)"
+)
+```
+
+Users aren't left guessing what numbers mean.
+
+---
+
+## Reasoning and Robustness Enhancements
+
+### Handling Vague or Conflicting Goals
+
+#### Current Implementation
+Our unified input interface addresses vague goals through **mode-specific prompting**:
+
+```python
+if action_type == "📚 Generate Learning Path":
+    placeholder = "Example: Learn about stock market investing, Understand retirement planning..."
+    label_text = "Enter your financial learning goal"
+elif action_type == "❓ Explain a Concept":
+    placeholder = "Example: What is a dividend yield? What are bonds?"
+    label_text = "Ask about any financial term or concept"
+else:  # "🤔 Explain Why"
+    placeholder = 'Examples: "Why 30% bonds?", "Why not cryptocurrency?"'
+    label_text = "Ask why the bot recommended something"
+```
+
+**How it works:**
+1. User selects mode via radio buttons
+2. Placeholder text adapts to show relevant examples
+3. Input validation ensures text is provided before submission
+4. If goal is too vague, AI generates a generic starting point that can be refined
+
+**Example**: User enters "help with money" → System generates a broad learning path covering budgeting, saving, and investing basics, then allows progressive refinement.
+
+#### Future Enhancements
+- Add explicit clarification prompts: "Your goal seems broad. Do you want to focus on: [Saving] [Investing] [Debt Management]?"
+- Implement multi-turn goal refinement before generating learning path
+- Add goal templates for common scenarios
+
+### Explainability View: Reasoning Transparency
+
+#### User Story 6: "Explain Why" Feature
+Users can ask **why** any recommendation was made:
+
+```python
+def explain_recommendation(user_question: str, **kwargs) -> str:
+    """Explain *why* a recommendation was made."""
+    risk_tolerance = kwargs.get("risk_tolerance")
+    age = kwargs.get("age")
+    suggested_allocation = kwargs.get("suggested_allocation")
+    
+    # Builds context from user profile and previous recommendations
+    context = f"User Profile: Age {age}, {risk_tolerance} risk tolerance..."
+    
+    # AI explains reasoning connecting to principles
+    prompt = """
+    Explain the reasoning behind the recommendation
+    - Connect to age, risk tolerance, diversification, time horizon
+    - Be concise and educational for beginners
+    """
+```
+
+**Transparency Mechanisms:**
+
+1. **Profile-Based Reasoning**: System explains decisions based on user's:
+   - Age (time horizon for compounding)
+   - Risk tolerance (volatility capacity)
+   - Experience level (complexity appropriateness)
+   - Time available (learning pace)
+
+2. **Historical Evidence**: User Story 8 provides data to support claims:
+   ```
+   "Index funds have delivered:
+   - 10-year average: ~12% annually
+   - 20-year average: ~10% annually
+   Context: Includes recovery from 2008 and COVID..."
+   ```
+
+3. **Portfolio Analysis Explanation**:
+   ```python
+   """
+   Provide a comprehensive portfolio analysis including:
+   1. Portfolio Health Assessment
+   2. Diversification Analysis
+   3. Risk Assessment
+   4. Specific Recommendations
+   5. Explanation: WHY each recommendation matters
+   """
+   ```
+
+#### LangGraph Reasoning Flow Visibility
+
+The system uses a **multi-node reasoning pipeline** that users can track:
+
+```python
+workflow = StateGraph(GoalState)
+workflow.add_node("decompose", decompose_goal)
+workflow.add_node("analyze_portfolio", analyze_portfolio)
+workflow.add_node("display", display_tasks)
+```
+
+**Visible Processing Steps:**
+1. "Creating your personalized learning path..." → `decompose_goal()` running
+2. "Analyzing your portfolio..." → `analyze_portfolio()` running
+3. Result display → `display_tasks()` complete
+
+Users see each reasoning step through loading indicators, building trust in the process.
+
+### Autonomy Control: Passive vs. Directive Modes
+
+#### Three Interaction Modes
+
+Our unified interface provides **user-controlled autonomy levels**:
+
+```python
+action_type = st.radio(
+    "What would you like to do?",
+    options=["📚 Generate Learning Path", "❓ Explain a Concept", "🤔 Explain Why"]
+)
+```
+
+| Mode | Autonomy Level | System Behavior | User Control |
+|------|----------------|-----------------|--------------|
+| **📚 Generate Learning Path** | **Directive** | System creates 4-5 step plan, analyzes portfolio, suggests allocations | User provides goal, system executes autonomously |
+| **❓ Explain a Concept** | **Passive** | System only answers specific questions asked | User drives all interactions, system is reactive |
+| **🤔 Explain Why** | **Reflective** | System explains its own prior decisions | User audits system reasoning, maintains oversight |
+
+#### Autonomy Boundaries
+
+**Where System Acts Autonomously:**
+- Generating learning subtasks from broad goals
+- Analyzing portfolio health and identifying risks
+- Suggesting asset allocations based on risk tolerance
+- Backtesting portfolios over historical periods
+- Comparing investment strategies
+
+**Where User Maintains Control:**
+- Choosing interaction mode (passive vs. directive)
+- Marking tasks as complete (no auto-advancement)
+- Adjusting allocations via natural language feedback
+- Selecting what to save/load (portfolio snapshots)
+- Resetting memory and starting fresh sessions
+
+**Critical Design Decision**: Tasks are **never auto-completed**. Users must explicitly mark them as done:
+```python
+if st.button("✓ Complete", key=f"complete_{idx}"):
+    st.session_state.goal_state["subtasks"][idx]["completed"] = True
+```
+
+This preserves user agency over learning progress.
+
+#### Adjustable Recommendation Strength
+
+Users can modify AI suggestions through:
+
+1. **Risk Tolerance Adjustment**: Changing from Conservative → Aggressive immediately affects recommendations
+2. **Natural Language Feedback**: "I want more stocks" → System adjusts allocation with trade-off explanations
+3. **Portfolio Comparison**: "Show me aggressive version" → Side-by-side comparison without commitment
+
+Example of human-in-the-loop adjustment:
+```python
+def adjust_allocation_by_feedback(current_allocation: dict, user_feedback: str):
+    """Adjust portfolio based on user feedback"""
+    # User: "I want more stocks"
+    # System: Increases stocks, explains volatility trade-off
+    # User maintains final decision authority
+```
+
+### Reflection on Trust, Predictability, and Autonomy
+
+#### How Changes Affect Trust
+
+1. **Consistent Visual Feedback**: Users trust the system because they always know what it's doing
+2. **Honest Uncertainty**: Disclaimers on historical data acknowledge limitations
+3. **Explainable Decisions**: "Explain Why" feature makes black-box AI transparent
+4. **Error Transparency**: Clear error messages with guidance build trust through honesty
+
+**Trust Metric**: Users can verify every recommendation against historical data (User Story 8) and backtesting (User Story 9).
+
+#### How Changes Affect Predictability
+
+1. **Mode Selection**: Radio buttons make system behavior explicit before interaction
+2. **Progressive Disclosure**: Collapsible sections mean users aren't surprised by hidden features
+3. **Input Validation**: Real-time feedback prevents invalid states
+4. **Consistent Patterns**: Every action follows: Loading → Success/Error → Display
+
+**Predictability Metric**: Users should never wonder "what will happen if I click this?"
+
+#### Autonomy Boundaries
+
+**Balanced Approach:**
+- **High Autonomy**: Learning path generation (user wants comprehensive plan)
+- **Medium Autonomy**: Portfolio analysis (user provides data, system provides insights)
+- **Low Autonomy**: Concept explanation (user asks, system answers)
+- **Zero Autonomy**: Task completion (always requires user confirmation)
+
+**Key Principle**: System can **recommend**, **explain**, and **analyze**, but never **act** on user's finances without explicit confirmation.
+
+---
+
+
